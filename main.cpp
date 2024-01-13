@@ -1,4 +1,4 @@
-#include "wsjtxreceiver.hpp"
+#include "utils.hpp"
 #define IMGUI_USE_STL_BINDINGS
 
 #include "json.hpp"
@@ -8,6 +8,8 @@
 #include "imgui_impl_sdlrenderer2.h"
 #include <stdio.h>
 #include <SDL.h>
+
+#include "PluginLoader.hpp"
 
 #if !SDL_VERSION_ATLEAST(2,0,17)
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
@@ -55,6 +57,16 @@ int main(int, char**)
 	{
 		printf("Error: %s\n", SDL_GetError());
 		return -1;
+	}
+
+	HamLab::DataShare data_share{GetAppDataFolder() + "/HamLab.json"};
+
+	std::string sPluginFolder;
+
+	if (std::filesystem::is_directory(GetAppDataFolder() + "/plugins")) {
+		sPluginFolder = GetAppDataFolder() + "/plugins";
+	} else if (std::filesystem::is_directory("./plugins")) {
+		sPluginFolder = "./plugins";
 	}
 
 	// From 2.0.18: Enable native IME.
@@ -109,8 +121,9 @@ int main(int, char**)
 
 	io.Fonts->AddFontDefault();
 
-	json::document jSettings;
-	jSettings.parseFile("settings.json");
+	HamLab::PluginLoader loader(sPluginFolder, data_share);
+
+	json::document jSettings = data_share.GetData("HamLabMain");
 
 	// Our state
 	bool show_demo_window = jSettings["show_demo_window"].boolean();
@@ -123,34 +136,15 @@ int main(int, char**)
 		}
 	}
 
-	char szWSJTXSendAddress[256];
-	memset(szWSJTXSendAddress, 0, sizeof(szWSJTXSendAddress));
-	if (jSettings.exists("wsjtx_send_address")) {
-		strncpy(szWSJTXSendAddress, jSettings["wsjtx_send_address"].c_str(), sizeof(szWSJTXSendAddress) - 1);
-	} else {
-		strncpy(szWSJTXSendAddress, "127.0.0.1", sizeof(szWSJTXSendAddress) - 1);
-	}
-
-	int wsjtx_send_port = 2237;
-	if (jSettings.exists("wsjtx_send_port")) {
-		wsjtx_send_port = jSettings["wsjtx_send_port"]._short();
-	}
-
-	int wsjtx_listen_port = 2237;
-	if (jSettings.exists("wsjtx_listen_port")) {
-		wsjtx_send_port = jSettings["wsjtx_listen_port"]._short();
-	}
-
 	ActiveTab activeTab = ActiveTab::Tab1;
 	if (jSettings.exists("activeTab")) {
 		activeTab = ActiveTab(jSettings["activeTab"]._int());
 	}
 
+	// WSJTXReceiver receiver(szWSJTXSendAddress, wsjtx_send_port, wsjtx_listen_port);
 
-	WSJTXReceiver receiver(szWSJTXSendAddress, wsjtx_send_port, wsjtx_listen_port);
-
-	receiver.Start();
-	receiver.Replay();
+	// receiver.Start();
+	// receiver.Replay();
 
 	// Main loop
 	bool done = false;
@@ -174,10 +168,6 @@ int main(int, char**)
 		int windowWidth, windowHeight;
 		SDL_GetWindowSize(window, &windowWidth, &windowHeight);
 
-		if (show_demo_window){
-			ImGui::ShowDemoWindow(&show_demo_window);
-		}
-
 		float sidebarWidth;
 		{
 			ImGui::GetStyle().Colors[ImGuiCol_WindowBg] = ImVec4(0.1f, 0.1f, 0.1f, 1.0f); // Set background color
@@ -191,45 +181,17 @@ int main(int, char**)
 						 ImGuiWindowFlags_NoSavedSettings |
 						 ImGuiWindowFlags_NoResize);
 
+			loader.CallDrawSideBarFunctions();
 
-			if (ImGui::CollapsingHeader("WSJT-X Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+			if (ImGui::CollapsingHeader("HamLab General Settings", jSettings["general_open"].boolean() ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
+				jSettings["general_open"] = true;
+				ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+				ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
 
-				// Adjust the layout of the main content area for Section 1
-				ImGui::InputText("Send Address", szWSJTXSendAddress, sizeof(szWSJTXSendAddress) - 1);
-				ImGui::InputInt("Send Port", &wsjtx_send_port);
-				ImGui::InputInt("Listen Port", &wsjtx_listen_port);
-
+				ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+			} else {
+				jSettings["general_open"] = false;
 			}
-
-			// Header 2
-			if (ImGui::CollapsingHeader("Section 2")) {
-				// Content for Section 2
-				ImGui::Text("Contents for Section 2");
-				// ...
-
-				// Adjust the layout of the main content area for Section 2
-				ImGui::Columns(1); // Reset to single column layout
-			}
-
-			// Header 3
-			if (ImGui::CollapsingHeader("Section 3")) {
-				// Content for Section 3
-				ImGui::Text("Contents for Section 3");
-				// ...
-
-				// Adjust the layout of the main content area for Section 3
-				ImGui::Columns(2, "MainContentLayout");
-				ImGui::Text("Left Column");
-				ImGui::NextColumn();
-				ImGui::Text("Right Column");
-				ImGui::Columns(1); // Reset to single column layout
-			}
-
-
-			ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-			ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-			ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
 			sidebarWidth = ImGui::GetWindowWidth();
 
@@ -249,100 +211,16 @@ int main(int, char**)
 						 ImGuiWindowFlags_NoSavedSettings |
 						 ImGuiWindowFlags_NoResize);
 
-			if (ImGui::BeginTabBar("Tabs"))
-			{
-				if (ImGui::BeginTabItem("Band Activity"))
-				{
-					json::document jHistory = receiver.history();
-					jHistory["Decode"].sort([](json::value & a, json::value & b) {
-						bool bTimeEqual = a["time"] == b["time"];
-						if (bTimeEqual) {
-							return a["snr"] > b["snr"];
-						} else {
-							return a["time"] > b["time"];
-						}
-					});
-					if (jHistory["Decode"].size() && jHistory["Decode"].front().size() && ImGui::BeginTable("Table", jHistory["Decode"].front().size(), ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_BordersOuterV))
-					{
-						// Set style for borders
-						ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(4, 2)); // Adjust cell padding if needed
-						ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(255, 255, 255, 255)); // Set border color
-
-						std::deque<std::string> headers;
-						std::deque<float> sizes;
-
-						for (auto & entry : jHistory["Decode"].front()) {
-							headers.push_back(entry.key());
-						}
-
-						sizes.resize(headers.size());
-						for (auto& row : jHistory["Decode"]) {
-							int iCol = 0;
-							for (auto & col : row) {
-								ImVec2 textSize = ImGui::CalcTextSize(col.c_str());
-								sizes[iCol] = std::max(sizes[iCol], textSize.x + ImGui::GetStyle().CellPadding.x * 2.0f);
-								++iCol;
-							}
-						}
-
-						// Headers
-						int colIndex = 0;
-						for (auto& entry : headers)
-						{
-							// ImGui::TableSetColumnIndex(colIndex);
-							ImGui::TableSetupColumn(entry.c_str(), ImGuiTableColumnFlags_WidthFixed, sizes[colIndex]);
-							++colIndex;
-
-							// std::cout << entry.c_str() << ": " << sizes[colIndex] << std::endl;
-						}
-
-
-						ImGui::TableHeadersRow();
-
-
-						// Data
-						size_t rowIndex = 0;
-						for (const auto& row : jHistory["Decode"])
-						{
-							ImGui::TableNextRow();
-							if (rowIndex++ % 2 == 0)
-								ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, IM_COL32(20, 20, 20, 255)); // Light background
-							else
-								ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, IM_COL32(10, 10, 10, 255)); // Dark background
-
-							int iCol = 0;
-							for (auto& entry : row)
-							{
-								ImGui::TableSetColumnIndex(static_cast<int>(iCol++));
-
-								ImGui::Text("%s", entry.c_str());
-							}
-						}
-
-						ImGui::PopStyleVar();
-						ImGui::PopStyleColor();
-
-						ImGui::EndTable();
-					}
-					ImGui::EndTabItem();
-				}
-
-				if (ImGui::BeginTabItem("Tab 2"))
-				{
-					ShowTab("Content for Tab 2", activeTab);
-					ImGui::EndTabItem();
-				}
-
-				if (ImGui::BeginTabItem("Tab 3"))
-				{
-					ShowTab("Content for Tab 3", activeTab);
-					ImGui::EndTabItem();
-				}
-
+			if (ImGui::BeginTabBar("Tabs")) {
+				loader.CallDrawTabFunctions();
 				ImGui::EndTabBar();
 			}
 
 			ImGui::End();
+		}
+
+		if (show_demo_window){
+			ImGui::ShowDemoWindow(&show_demo_window);
 		}
 
 		// Rendering
@@ -354,7 +232,7 @@ int main(int, char**)
 		SDL_RenderPresent(renderer);
 	}
 
-	receiver.Stop();
+	// receiver.Stop();
 
 	// Our state
 	jSettings["show_demo_window"] = show_demo_window;
@@ -365,11 +243,8 @@ int main(int, char**)
 	jSettings["clear_color"][3] = clear_color.w;
 
 	jSettings["activeTab"] = (int)activeTab;
-	jSettings["wsjtx_send_address"] = szWSJTXSendAddress;
-	jSettings["wsjtx_send_port"] = wsjtx_send_port;
-	jSettings["wsjtx_listen_port"] = wsjtx_listen_port;
 
-	jSettings.writeFile("settings.json", true);
+	data_share.SetData("HamLabMain", jSettings);
 
 	// Cleanup
 	ImGui_ImplSDLRenderer2_Shutdown();

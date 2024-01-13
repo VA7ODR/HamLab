@@ -13,6 +13,8 @@
 
 #include "json.hpp"
 
+std::string GetAppDataFolder();
+
 template <typename T>
 T swapEndianness(T value) {
 	static_assert(std::is_arithmetic<T>::value, "Only arithmatic types are supported");

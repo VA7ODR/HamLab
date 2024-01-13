@@ -16,3 +16,26 @@ std::string Pretty(const std::vector<unsigned char> &in)
 	return sRet;
 }
 
+
+std::string GetAppDataFolder()
+{
+#if defined(_WIN32)
+	const char *appDataEnvVar = std::getenv("APPDATA");
+	if (appDataEnvVar)
+		return appDataEnvVar;
+	else
+		return ""; // Handle error on Windows
+#elif defined(__APPLE__)
+	const char *homeDir = std::getenv("HOME");
+	if (homeDir)
+		return std::string(homeDir) + "/Library/Application Support";
+	else
+		return ""; // Handle error on macOS
+#else
+	const char *homeDir = std::getenv("HOME");
+	if (homeDir)
+		return std::string(homeDir) + "/.local/share";
+	else
+		return ""; // Handle error on Linux
+#endif
+}
