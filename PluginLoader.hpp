@@ -35,7 +35,11 @@ namespace HamLab
 			{
 				if (plugin) {
 					if (plugin->ShowSideBar()) {
-						jLocalData["plugin"][name]["sidebar_open"] = plugin->DrawSideBar(jLocalData["plugin"][name]["sidebar_open"].boolean());
+						bool bOpen = plugin->DrawSideBar(jLocalData["plugin"][name]["sidebar_open"].boolean());
+						jLocalData["plugin"][name]["sidebar_open"] = bOpen;
+						if (bOpen) {
+							ImGui::Text(" ");
+						}
 					}
 				}
 			}
@@ -45,8 +49,8 @@ namespace HamLab
 				jLocalData["plugins_open"] = true;
 
 				for (auto & do_plugin : all_plugins_do_load_) {
-					auto & plugin = loaded_plugins_[do_plugin.first];
-					if (ImGui::Checkbox(do_plugin.first.c_str(), &do_plugin.second)) {
+					if (all_plugins_.find(do_plugin.first) != all_plugins_.end() && ImGui::Checkbox(do_plugin.first.c_str(), &do_plugin.second)) {
+						auto & plugin = loaded_plugins_[do_plugin.first];
 						if (do_plugin.second) {
 							auto & lib = all_plugins_[do_plugin.first];
 							if (!plugin) {
@@ -68,6 +72,7 @@ namespace HamLab
 						jLocalData["loaded_plugins"][do_plugin.first] = (plugin != nullptr);
 					}
 				}
+				ImGui::Text(" ");
 			} else {
 				jLocalData["plugins_open"] = false;
 			}
@@ -83,6 +88,15 @@ namespace HamLab
 					}
 				}
 			}
+		}
+
+		DataShare & data_share() { return data_share_; }
+
+		void LoadPlugin(PluginBase * pPlugin)
+		{
+			loaded_plugins_[pPlugin->Name()] = pPlugin;
+			auto version = *pPlugin->Version();
+			all_plugins_versions_.insert({pPlugin->Name(), version});
 		}
 
 	private:
@@ -171,7 +185,7 @@ namespace HamLab
 
 	private:
 		DataShare &data_share_;
-		json::document jLocalData;
+		ojson::document jLocalData;
 		std::string pluginDir_;
 		std::map<std::string, bool> all_plugins_do_load_;
 		std::map<std::string, APIVersion> all_plugins_versions_;

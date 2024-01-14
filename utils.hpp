@@ -1,22 +1,101 @@
 #pragma once
 
-// #include <cassert>
+#include "imgui.h"
+#include "json.hpp"
+
+#include <boost/core/demangle.hpp>
+#include <boost/stacktrace/stacktrace.hpp>
 #include <cstdint>
-// #include <iostream>
-#include <iostream>
+#include <iterator>
 #include <string>
 #include <vector>
-#include <iterator>
-#include <boost/core/demangle.hpp>
-
-#include <boost/stacktrace/stacktrace.hpp>
-
-#include "json.hpp"
 
 std::string GetAppDataFolder();
 
+void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bShow);
+
+ojson::value ImVec4ToJSONArray(const ImVec4 & in);
+ImVec4 JSONArrayToImVec4(ojson::value & jData);
+
 template <typename T>
-T swapEndianness(T value) {
+class jsonTypedRef
+{
+	public:
+		// Constructor for bool
+		jsonTypedRef(ojson::value & jValIn)
+			requires std::is_same_v<T, bool>
+			: jVal(jValIn)
+		{
+			m_val = jVal.boolean();
+		}
+
+		// Constructor for floating-point types
+		jsonTypedRef(ojson::value & jValIn)
+			requires std::is_floating_point_v<T>
+			: jVal(jValIn)
+		{
+			m_val = jVal._double();
+		}
+
+		// Constructor for integral types (excluding bool)
+		// Constructor for signed integral types
+		jsonTypedRef(ojson::value & jValIn)
+			requires std::is_integral_v<T> && std::is_signed_v<T> && (!std::is_same_v<T, bool>)
+			: jVal(jValIn)
+		{
+			m_val = jVal._int64();
+		}
+
+		// Constructor for unsigned integral types
+		jsonTypedRef(ojson::value & jValIn)
+			requires std::is_integral_v<T> && std::is_unsigned_v<T> && (!std::is_same_v<T, bool>)
+			: jVal(jValIn)
+		{
+			m_val = jVal._uint64();
+		}
+
+		// Constructor for char*/std::string
+		jsonTypedRef(ojson::value & jValIn)
+			requires std::is_same_v<T, char *> || std::is_same_v<T, std::string> || std::is_same_v<T, sdstring>
+			: jVal(jValIn)
+		{
+			m_val = jVal.string().data();
+		}
+
+		~jsonTypedRef() { jVal = m_val; }
+
+		operator T *()
+			requires(!std::is_pointer_v<T>)
+		{
+			return &m_val;
+		}
+
+		operator T()
+			requires(std::is_pointer_v<T>)
+		{
+			return m_val;
+		}
+
+		// operator T &()
+		// 	requires(!std::is_pointer_v<T>)
+		// {
+		// 	return m_val;
+		// }
+
+		// operator T &()
+		// 	requires(std::is_pointer_v<T>)
+		// {
+		// 	return *m_val;
+		// }
+
+	private:
+		T m_val;
+		ojson::value & jVal;
+};
+
+template <typename T>
+T swapEndianness(T value)
+{
 	static_assert(std::is_arithmetic<T>::value, "Only arithmatic types are supported");
 	union {
 		T value;
@@ -93,7 +172,8 @@ public:
 	}
 
 	template <typename OT>
-	void Bin2Num(json::value& val) {
+	void Bin2Num(ojson::value & val)
+	{
 		static_assert(std::is_arithmetic_v<OT>, "Only integral and floating-point types are supported.");
 		HandleCurrentTag handler(sCurrentTag, val.key());
 		val = Bin2Num<OT>();
@@ -101,7 +181,7 @@ public:
 
 	std::string Bin2Str() {
 		auto len = Bin2Num<uint32_t>();
-		if (len == 0xFFFFFFFF) {
+		if (len == 0xFFFFFFFF || len == 0) {
 			return "";
 		}
 		HAMLIB_ASSERT(len <= static_cast<size_t>(std::distance(it_, end_)), "Bin2Str \"" + sCurrentTag + "\" (" + std::to_string(len) + " > " + std::to_string(std::distance(it_, end_)) + ")");
@@ -111,7 +191,8 @@ public:
 		return ret;
 	}
 
-	void Bin2Str(json::value& val) {
+	void Bin2Str(ojson::value & val)
+	{
 		HandleCurrentTag handler(sCurrentTag, val.key());
 		val = Bin2Str();
 	}

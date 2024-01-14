@@ -1,7 +1,9 @@
 #pragma once
 
+#include "imgui.h"
 #include "json.hpp"
 #include "shared_recursive_mutex.hpp"
+
 #include <string>
 
 namespace HamLab
@@ -22,7 +24,7 @@ namespace HamLab
 
 	constexpr APIVersion CURRENT_API_VERSION{1, 2, 3};
 
-	std::ostream &operator<<(std::ostream &os, const APIVersion &version)
+	inline std::ostream & operator<<(std::ostream & os, const APIVersion & version)
 	{
 		os << version.toString();
 		return os;
@@ -43,7 +45,7 @@ class DataShare
 			jData.writeFile(sFileName, true);
 		}
 
-		json::value GetData(const std::string & sKey, json::value jDefault = json::value())
+		ojson::value GetData(const std::string & sKey, ojson::value jDefault = ojson::value())
 		{
 			RecursiveExclusiveLock lock(mtx);
 			auto & jRet = jData[sKey];
@@ -53,7 +55,7 @@ class DataShare
 			return jRet;
 		}
 
-		void SetData(const std::string & sKey, json::value & jValue)
+		void SetData(const std::string & sKey, ojson::value & jValue)
 		{
 			RecursiveExclusiveLock lock(mtx);
 			jData[sKey] = jValue;
@@ -62,7 +64,7 @@ class DataShare
 	private:
 		SharedRecursiveMutex mtx;
 		std::string sFileName;
-		json::document jData;
+		ojson::document jData;
 };
 
 class PluginBase
@@ -80,6 +82,8 @@ class PluginBase
 
 		constexpr const std::string & Name() { return name; }
 
+		const APIVersion * Version() { return &CURRENT_API_VERSION; }
+
 		virtual void DrawTab() = 0;
 		virtual bool DrawSideBar(bool) = 0;
 
@@ -89,7 +93,7 @@ class PluginBase
 	protected:
 		DataShare & data_share_;
 		std::string name;
-		json::document jLocalData;
+		ojson::document jLocalData;
 };
 
 } //HamLab

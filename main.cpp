@@ -1,53 +1,20 @@
 #include "utils.hpp"
 #define IMGUI_USE_STL_BINDINGS
 
-#include "json.hpp"
-
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
-#include <stdio.h>
-#include <SDL.h>
-
+#include "json.hpp"
+#include "logger/logger.hpp"
 #include "PluginLoader.hpp"
+
+#include <filesystem>
+#include <SDL.h>
+#include <stdio.h>
 
 #if !SDL_VERSION_ATLEAST(2,0,17)
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
 #endif
-
-enum class ActiveTab
-{
-	Tab1,
-	Tab2,
-	Tab3
-};
-
-void ShowTab(const char* label, ActiveTab& activeTab)
-{
-	bool isOpen = (activeTab == ActiveTab::Tab1 && strcmp(label, "Tab 1") == 0) ||
-			(activeTab == ActiveTab::Tab2 && strcmp(label, "Tab 2") == 0) ||
-			(activeTab == ActiveTab::Tab3 && strcmp(label, "Tab 3") == 0);
-
-	if (ImGui::CollapsingHeader(label, isOpen ? ImGuiTreeNodeFlags_DefaultOpen : 0))
-	{
-		ImGui::Text("This is the content for %s", label);
-
-		if (isOpen)
-		{
-			ImGui::BulletText("Tab is open!");
-			if (ImGui::Button("Close Tab"))
-				activeTab = ActiveTab::Tab1; // Close the tab by setting activeTab to a default or closed state
-		}
-		else
-		{
-			ImGui::BulletText("Tab is closed!");
-			if (ImGui::Button("Open Tab"))
-				activeTab = (strcmp(label, "Tab 1") == 0) ? ActiveTab::Tab1 :
-															(strcmp(label, "Tab 2") == 0) ? ActiveTab::Tab2 :
-																							(strcmp(label, "Tab 3") == 0) ? ActiveTab::Tab3 : ActiveTab::Tab1;
-		}
-	}
-}
 
 // Main code
 int main(int, char**)
@@ -76,7 +43,7 @@ int main(int, char**)
 
 	// Create window with SDL_Renderer graphics context
 	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_MAXIMIZED);
-	SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL2+SDL_Renderer example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1080, window_flags);
+	SDL_Window* window = SDL_CreateWindow((std::string("HamLab v") + HamLab::CURRENT_API_VERSION.toString()).c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1080, window_flags);
 	if (window == nullptr)
 	{
 		printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
@@ -106,11 +73,21 @@ int main(int, char**)
 
 	auto & style = ImGui::GetStyle();
 
-	style.FrameBorderSize = 1.0;
-	style.FrameRounding = 8.0;
 	style.DisplayWindowPadding = {0, 0};
 
-	io.FontDefault = io.Fonts->Fonts[4];
+	style.WindowRounding = 8.0;
+	style.ChildRounding = 8.0;
+	style.FrameRounding = 8.0;
+	style.PopupRounding = 8.0;
+	style.ScrollbarRounding = 8.0;
+	style.GrabRounding = 8.0;
+	style.TabRounding = 6.0;
+
+	style.WindowBorderSize = 0.0;
+	style.ChildBorderSize = 1.0;
+	style.PopupBorderSize = 1.0;
+	style.FrameBorderSize = 1.0;
+	style.TabBorderSize = 1.0;
 
 	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();
@@ -123,42 +100,42 @@ int main(int, char**)
 
 	HamLab::PluginLoader loader(sPluginFolder, data_share);
 
-	json::document jSettings = data_share.GetData("HamLabMain");
+	loader.LoadPlugin(Logger::create(loader.data_share(), "Logger"));
+
+	ojson::document jSettings = data_share.GetData("HamLabMain");
 
 	// Our state
-	bool show_demo_window = jSettings["show_demo_window"].boolean();
+	// bool show_demo_window = jSettings["show_demo_window"].boolean();
 
-	ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
-	if (jSettings.exists("clear_color")) {
-		auto & jClearColor = jSettings["clear_color"];
-		if (jClearColor.size() >= 4) {
-			clear_color = ImVec4(jClearColor[0]._float(), jClearColor[1]._float(), jClearColor[2]._float(), jClearColor[3]._float());
+	size_t iFontIndex = 3;
+	if (jSettings.exists("default_font")) {
+		iFontIndex = jSettings["default_font"]._size_t();
+	}
+
+	io.FontDefault = io.Fonts->Fonts[iFontIndex];
+
+	if (jSettings.exists("chosen_colours")) {
+		ImVec4 * colors = ImGui::GetStyle().Colors;
+		for (int i = 0; i < ImGuiCol_COUNT; ++i) {
+			colors[i] = JSONArrayToImVec4(jSettings["chosen_colours"][i]);
 		}
 	}
 
-	ActiveTab activeTab = ActiveTab::Tab1;
-	if (jSettings.exists("activeTab")) {
-		activeTab = ActiveTab(jSettings["activeTab"]._int());
-	}
-
-	// WSJTXReceiver receiver(szWSJTXSendAddress, wsjtx_send_port, wsjtx_listen_port);
-
-	// receiver.Start();
-	// receiver.Replay();
+	bool bShowSettingsJSON = jSettings["jsow_settings_json"].boolean();
 
 	// Main loop
 	bool done = false;
 
-	while (!done)
-	{
+	while (!done) {
 		SDL_Event event;
-		while (SDL_PollEvent(&event))
-		{
+		while (SDL_PollEvent(&event)) {
 			ImGui_ImplSDL2_ProcessEvent(&event);
-			if (event.type == SDL_QUIT)
+			if (event.type == SDL_QUIT) {
 				done = true;
-			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
+			}
+			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) {
 				done = true;
+			}
 		}
 
 		ImGui_ImplSDLRenderer2_NewFrame();
@@ -168,65 +145,78 @@ int main(int, char**)
 		int windowWidth, windowHeight;
 		SDL_GetWindowSize(window, &windowWidth, &windowHeight);
 
-		float sidebarWidth;
-		{
-			ImGui::GetStyle().Colors[ImGuiCol_WindowBg] = ImVec4(0.1f, 0.1f, 0.1f, 1.0f); // Set background color
-			ImVec2 sidebarSize(windowWidth * 0.2f, static_cast<float>(windowHeight));
-			ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
-			ImGui::SetNextWindowSize(sidebarSize); // Set the width to 1/5th of the window width
-			ImGui::Begin("HamLab", nullptr,
-						 ImGuiWindowFlags_NoTitleBar |
-						 ImGuiWindowFlags_NoMove |
-						 ImGuiWindowFlags_NoCollapse |
-						 ImGuiWindowFlags_NoSavedSettings |
-						 ImGuiWindowFlags_NoResize);
+		ImVec2 sidebarSize(windowWidth, static_cast<float>(windowHeight));
+		ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
+		ImGui::SetNextWindowSize(sidebarSize); // Set the width to 1/5th of the window width
 
-			loader.CallDrawSideBarFunctions();
+		ImGui::Begin("HamLab", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDecoration);
 
-			if (ImGui::CollapsingHeader("HamLab General Settings", jSettings["general_open"].boolean() ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
-				jSettings["general_open"] = true;
-				ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-				ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+		ImGui::PushStyleColor(ImGuiCol_Border, ImGui::GetStyleColorVec4(ImGuiCol_Border));
+		style.Colors[ImGuiCol_Border] = style.Colors[ImGuiCol_BorderShadow] = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
+		ImGui::BeginTable("Main", 2, ImGuiTableFlags_Resizable);
 
-				ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-			} else {
-				jSettings["general_open"] = false;
+		ImGui::TableSetupColumn("SideBar", ImGuiTableColumnFlags_WidthStretch, windowWidth * 0.2);
+		ImGui::TableSetupColumn("Tabs", ImGuiTableColumnFlags_WidthStretch, windowWidth * 0.8);
+
+		ImGui::TableNextRow();
+		ImGui::PopStyleColor();
+		ImGui::TableSetColumnIndex(0);
+		loader.CallDrawSideBarFunctions();
+
+		if (ImGui::CollapsingHeader("HamLab General Settings", jSettings["general_open"].boolean() ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
+			jSettings["general_open"] = true;
+
+			ImFont * font_current = ImGui::GetFont();
+			if (ImGui::BeginCombo("Font", font_current->GetDebugName())) {
+				size_t iIndex = 0;
+				for (ImFont * font : io.Fonts->Fonts) {
+					ImGui::PushID((void *)font);
+					if (ImGui::Selectable(font->GetDebugName(), font == font_current)) {
+						io.FontDefault = font;
+						iFontIndex = iIndex;
+					}
+					ImGui::PopID();
+					++iIndex;
+				}
+				ImGui::EndCombo();
 			}
 
-			sidebarWidth = ImGui::GetWindowWidth();
+			ImGui::ShowStyleSelector("Select Style");
 
-			ImGui::End();
-		}
+			ImGui::Checkbox("Demo Window", jsonTypedRef<bool>(jSettings["show_demo_window"])); // Edit bools storing our window open/close state
+			ImGui::Checkbox("Show Settings", &bShowSettingsJSON);
 
-
-		// Main content window
-		{
-			ImGui::GetStyle().Colors[ImGuiCol_WindowBg] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f); // Set background color
-			ImGui::SetNextWindowPos(ImVec2(sidebarWidth, 0.0f), ImGuiCond_Always);
-			ImGui::SetNextWindowSize(ImVec2(windowWidth - sidebarWidth, static_cast<float>(windowHeight)), ImGuiCond_Always);
-			ImGui::Begin("Main Content", nullptr,
-						 ImGuiWindowFlags_NoTitleBar |
-						 ImGuiWindowFlags_NoMove |
-						 ImGuiWindowFlags_NoCollapse |
-						 ImGuiWindowFlags_NoSavedSettings |
-						 ImGuiWindowFlags_NoResize);
-
-			if (ImGui::BeginTabBar("Tabs")) {
-				loader.CallDrawTabFunctions();
-				ImGui::EndTabBar();
+			if (bShowSettingsJSON) {
+				ShowJsonWindow("HamLab Settings", jSettings, bShowSettingsJSON);
 			}
 
-			ImGui::End();
+			ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+
+		} else {
+			jSettings["general_open"] = false;
 		}
 
-		if (show_demo_window){
-			ImGui::ShowDemoWindow(&show_demo_window);
+		ImGui::TableSetColumnIndex(1);
+
+		ImGui::BeginChild("child", ImVec2(0, 0), ImGuiChildFlags_Border | ImGuiChildFlags_FrameStyle);
+		if (ImGui::BeginTabBar("Tabs")) {
+			loader.CallDrawTabFunctions();
+			ImGui::EndTabBar();
+		}
+		ImGui::EndChild();
+
+		ImGui::EndTable();
+
+		ImGui::End();
+
+		if (jSettings["show_demo_window"].boolean()) {
+			ImGui::ShowDemoWindow(jsonTypedRef<bool>(jSettings["show_demo_window"]));
 		}
 
 		// Rendering
 		ImGui::Render();
 		SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-		SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255), (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 1);
 		SDL_RenderClear(renderer);
 		ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
 		SDL_RenderPresent(renderer);
@@ -235,14 +225,17 @@ int main(int, char**)
 	// receiver.Stop();
 
 	// Our state
-	jSettings["show_demo_window"] = show_demo_window;
+	// jSettings["show_demo_window"] = show_demo_window;
+	jSettings["default_font"] = iFontIndex;
 
-	jSettings["clear_color"][0] = clear_color.x;
-	jSettings["clear_color"][1] = clear_color.y;
-	jSettings["clear_color"][2] = clear_color.z;
-	jSettings["clear_color"][3] = clear_color.w;
+	{
+		ImVec4 * colors = ImGui::GetStyle().Colors;
+		for (int i = 0; i < ImGuiCol_COUNT; ++i) {
+			jSettings["chosen_colours"][i] = ImVec4ToJSONArray(colors[i]);
+		}
+	}
 
-	jSettings["activeTab"] = (int)activeTab;
+	jSettings["jsow_settings_json"] = bShowSettingsJSON;
 
 	data_share.SetData("HamLabMain", jSettings);
 
