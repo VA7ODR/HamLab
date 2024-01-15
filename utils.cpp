@@ -50,7 +50,7 @@ void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bSh
 	static ImGuiTreeNodeFlags tree_node_flags = ImGuiTreeNodeFlags_SpanAllColumns;
 	// 	ImGui::CheckboxFlags("ImGuiTreeNodeFlags_SpanFullWidth", &tree_node_flags, ImGuiTreeNodeFlags_SpanFullWidth);
 	// 	ImGui::CheckboxFlags("ImGuiTreeNodeFlags_SpanAllColumns", &tree_node_flags, ImGuiTreeNodeFlags_SpanAllColumns);
-
+	ImGui::Text("Right-click field name or value to copy it to the clipboard.");
 	if (ImGui::BeginTable("3ways", 3, flags)) {
 		// The first column will use the default _WidthStretch when ScrollX is Off and _WidthFixed when ScrollX is On
 		ImGui::TableSetupColumn("Index", ImGuiTableColumnFlags_NoHide | ImGuiTableColumnFlags_WidthStretch);
@@ -68,47 +68,74 @@ void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bSh
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TreeNodeEx(sName.c_str(), tree_node_flags | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_NoTreePushOnOpen);
+					if (ImGui::IsItemClicked(1)) {
+						ImGui::SetClipboardText(sName.c_str());
+					}
 					ImGui::TableNextColumn();
 					ImGui::Text("NULL");
+					if (ImGui::IsItemClicked(1)) {
+						ImGui::SetClipboardText("NULL");
+					}
 					ImGui::TableNextColumn();
 					ImGui::Text("null");
-					return;
+					break;
 
 				case ojson::JSON_BOOLEAN:
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TreeNodeEx(sName.c_str(), tree_node_flags | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_NoTreePushOnOpen);
+					if (ImGui::IsItemClicked(1)) {
+						ImGui::SetClipboardText(sName.c_str());
+					}
 					ImGui::TableNextColumn();
 					ImGui::Text(jValue.boolean() ? "true" : "false");
+					if (ImGui::IsItemClicked(1)) {
+						ImGui::SetClipboardText(jValue.boolean() ? "true" : "false");
+					}
 					ImGui::TableNextColumn();
 					ImGui::Text("bool");
-					return;
+					break;
 
 				case ojson::JSON_NUMBER:
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TreeNodeEx(sName.c_str(), tree_node_flags | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_NoTreePushOnOpen);
+					if (ImGui::IsItemClicked(1)) {
+						ImGui::SetClipboardText(sName.c_str());
+					}
 					ImGui::TableNextColumn();
 					ImGui::Text("%s", jValue.c_str());
+					if (ImGui::IsItemClicked(1)) {
+						ImGui::SetClipboardText(jValue.c_str());
+					}
 					ImGui::TableNextColumn();
 					ImGui::Text("number");
-					return;
+					break;
 
 				case ojson::JSON_STRING:
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TreeNodeEx(sName.c_str(), tree_node_flags | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_NoTreePushOnOpen);
+					if (ImGui::IsItemClicked(1)) {
+						ImGui::SetClipboardText(sName.c_str());
+					}
 					ImGui::TableNextColumn();
 					ImGui::Text("%s", jValue.c_str());
+					if (ImGui::IsItemClicked(1)) {
+						ImGui::SetClipboardText(jValue.c_str());
+					}
 					ImGui::TableNextColumn();
 					ImGui::Text("string");
-					return;
+					break;
 
 				case ojson::JSON_OBJECT:
 				{
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					bool open = ImGui::TreeNodeEx(sName.c_str(), tree_node_flags | ImGuiTreeNodeFlags_DefaultOpen);
+					if (ImGui::IsItemClicked(1)) {
+						ImGui::SetClipboardText(sName.c_str());
+					}
 					ImGui::TableNextColumn();
 					ImGui::TextDisabled("--");
 					ImGui::TableNextColumn();
@@ -119,7 +146,7 @@ void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bSh
 						}
 						ImGui::TreePop();
 					}
-					return;
+					break;
 				}
 
 				case ojson::JSON_ARRAY:
@@ -127,6 +154,9 @@ void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bSh
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					bool open = ImGui::TreeNodeEx(sName.c_str(), tree_node_flags | ImGuiTreeNodeFlags_DefaultOpen);
+					if (ImGui::IsItemClicked(1)) {
+						ImGui::SetClipboardText(sName.c_str());
+					}
 					ImGui::TableNextColumn();
 					ImGui::TextDisabled("--");
 					ImGui::TableNextColumn();
@@ -138,7 +168,7 @@ void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bSh
 						}
 						ImGui::TreePop();
 					}
-					return;
+					break;
 				}
 			}
 		};

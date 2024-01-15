@@ -59,7 +59,8 @@ int main(int, char**)
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	ImGuiIO & io = ImGui::GetIO();
+
 	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 12);
 	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 16);
 	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 18);
@@ -68,7 +69,11 @@ int main(int, char**)
 	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 48);
 	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 64);
 	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 72);
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/liquid_crystal/LiquidCrystal-Normal.otf", 18);
+	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/liquid_crystal/LiquidCrystal-Normal.otf", 36);
+	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/liquid_crystal/LiquidCrystal-Normal.otf", 72);
+	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/liquid_crystal/LiquidCrystal-Normal.otf", 144);
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;	  // Enable Keyboard Controls
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
 	auto & style = ImGui::GetStyle();
@@ -96,7 +101,7 @@ int main(int, char**)
 	ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
 	ImGui_ImplSDLRenderer2_Init(renderer);
 
-	io.Fonts->AddFontDefault();
+	// io.Fonts->AddFontDefault();
 
 	HamLab::PluginLoader loader(sPluginFolder, data_share);
 
@@ -161,6 +166,7 @@ int main(int, char**)
 		ImGui::TableNextRow();
 		ImGui::PopStyleColor();
 		ImGui::TableSetColumnIndex(0);
+		ImGui::BeginChild("sidebar_child", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY);
 		loader.CallDrawSideBarFunctions();
 
 		if (ImGui::CollapsingHeader("HamLab General Settings", jSettings["general_open"].boolean() ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
@@ -196,9 +202,11 @@ int main(int, char**)
 			jSettings["general_open"] = false;
 		}
 
+		ImGui::EndChild();
+
 		ImGui::TableSetColumnIndex(1);
 
-		ImGui::BeginChild("child", ImVec2(0, 0), ImGuiChildFlags_Border | ImGuiChildFlags_FrameStyle);
+		ImGui::BeginChild("tab_child", ImVec2(0, 0), ImGuiChildFlags_Border | ImGuiChildFlags_FrameStyle);
 		if (ImGui::BeginTabBar("Tabs")) {
 			loader.CallDrawTabFunctions();
 			ImGui::EndTabBar();

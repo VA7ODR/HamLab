@@ -30,6 +30,7 @@ add_library(utils STATIC utils.cpp utils.hpp)
 
 add_subdirectory(wsjtx)
 add_subdirectory(logger)
+add_subdirectory(rigctl)
 
 add_executable(HamLab main.cpp utils.hpp HamLabPlugin.hpp PluginLoader.hpp)
 if(TARGET SDL2::SDL2main)
