@@ -22,7 +22,7 @@ namespace HamLab
 		}
 	};
 
-	constexpr APIVersion CURRENT_API_VERSION{1, 2, 3};
+	constexpr APIVersion CURRENT_API_VERSION{0, 0, 1};
 
 	inline std::ostream & operator<<(std::ostream & os, const APIVersion & version)
 	{
