@@ -1,9 +1,11 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.27)
 
 project(HamLab LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_compile_definitions(SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 option(ADDRESSSANITIZER "Use AddressSanitizer" OFF)
 
@@ -18,7 +20,7 @@ add_subdirectory(shared_recursive_mutex)
 
 find_package(SDL2 REQUIRED CONFIG REQUIRED COMPONENTS SDL2)
 find_package(SDL2 REQUIRED CONFIG COMPONENTS SDL2main)
-find_package(Boost REQUIRED filesystem system)
+find_package(Boost REQUIRED filesystem system url)
 find_package(OpenGL REQUIRED)
 
 add_compile_definitions(SUPPORT_ORDERED_JSON)
@@ -33,9 +35,9 @@ add_subdirectory(wsjtx)
 add_subdirectory(logger)
 add_subdirectory(rigctl)
 
-add_executable(HamLab main.cpp utils.hpp HamLabPlugin.hpp PluginLoader.hpp)
+add_executable(HamLab main.cpp utils.hpp app_logger.cpp app_logger.hpp network.cpp network.cpp thread.cpp thread.hpp eventhandler.cpp eventhandler.hpp HamLabPlugin.hpp PluginLoader.hpp)
 if(TARGET SDL2::SDL2main)
     target_link_libraries(HamLab PRIVATE SDL2::SDL2main)
 endif()
-target_link_libraries(HamLab PRIVATE json_document imgui utils logger SDL2::SDL2 OpenGL::GL Boost::filesystem Boost::system)
+target_link_libraries(HamLab PRIVATE json_document imgui utils logger crypto ssl SDL2::SDL2 OpenGL::GL Boost::filesystem Boost::system Boost::url)
 

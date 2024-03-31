@@ -9,6 +9,81 @@
 #include <iterator>
 #include <string>
 #include <vector>
+#include <string>
+#include <chrono>
+#include <format>
+#include <cstring>
+
+using namespace std::chrono_literals;
+
+inline auto Now()
+{
+	return std::chrono::utc_clock::now();
+}
+
+inline auto SystemNow()
+{
+	return std::chrono::system_clock::now();
+}
+
+inline auto SteadyNow()
+{
+	return std::chrono::steady_clock::now();
+}
+
+inline std::string PrettyDateTime(auto time, const std::string_view formatIn = "{:%Y-%m-%d %H:%M:%S}")
+{
+	try {
+		auto ret = std::vformat(formatIn, std::make_format_args(time));
+		return ret;
+	} catch (std::format_error & e) {
+		return "Invalid time: " + std::string(e.what());
+	}
+}
+
+inline std::string PrettyDate(auto time)
+{
+	return sPrettyDateTime(time, "{:%Y-%m-%d}");
+}
+
+inline std::string PrettyTime(auto time)
+{
+	return sPrettyDateTime(time, "{:%H:%M:%S}");
+}
+
+inline std::string PrettyDuration(auto duration = 0s, const std::string_view format = "{:%H:%M:%S}")
+{
+	return std::vformat(format, std::make_format_args(duration));
+}
+
+inline std::string PrettyDuration(auto start, auto end, const std::string_view format = "{:%H:%M:%S}")
+{
+	return PrettyDuration(end - start, format);
+}
+
+inline std::chrono::utc_clock::time_point UTCTime(auto time)
+{
+	return std::chrono::clock_cast<std::chrono::utc_clock>(time);
+}
+
+inline std::chrono::system_clock::time_point SystemTime(auto time = std::chrono::utc_clock::now())
+{
+	return std::chrono::clock_cast<std::chrono::system_clock>(time);
+}
+
+inline std::chrono::steady_clock::time_point SteadyTime(auto time = std::chrono::utc_clock::now())
+{
+	return std::chrono::clock_cast<std::chrono::steady_clock>(time);
+}
+
+inline void Asserter(bool bCondition, const std::string& sCondition, const std::string & sFile, const std::string & sFunction, int iLine) {
+	if (!bCondition) {
+		throw std::runtime_error(sCondition + " failed in " + sFile + " " + sFunction + " " + std::to_string(iLine));
+	}
+}
+
+#define ASSERT(bCondition) Asserter(bCondition, #bCondition, SOURCE_FILE, __FUNCTION__, __LINE__)
+#define SOURCE_FILE std::string(__FILE__).substr(strlen(SOURCE_DIR) + 1)
 
 std::string GetAppDataFolder();
 

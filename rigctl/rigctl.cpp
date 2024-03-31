@@ -242,7 +242,7 @@ int rig_logger(enum rig_debug_level_e level, rig_ptr_t, const char * fmt, va_lis
 	jThisLog["local_time"] = localTimeStream.str();
 	jThisLog["universal_time"] = gmtTimeStream.str();
 
-	jThisLog["message"] = buf;
+	jThisLog["message"] = std::string(buf, w);
 	jLog.push_back(jThisLog);
 	return 1;
 }
@@ -304,7 +304,6 @@ ojson::document createRigComboBoxMap()
 		jRigs[caps->mfg_name][caps->model_name]["has_set_parm"] = (int)rig->state.has_set_parm;
 		jRigs[caps->mfg_name][caps->model_name]["power_min"] = (int)rig->state.power_min;
 		jRigs[caps->mfg_name][caps->model_name]["power_max"] = (int)rig->state.power_max;
-		// jRigs[caps->mfg_name][caps->model_name]["current_freq"] = rig->state.current_freq;
 
 		rig_cleanup(rig);
 		return 1;
@@ -327,9 +326,6 @@ RigControl::RigControl(HamLab::DataShare & pDataShareIn, const std::string & nam
 {
 	jMyRigs = createRigComboBoxMap();
 	jLocalData["current_rig"]["available_settings"].clear();
-
-	// typedef int (*dcd_cb_t)(RIG *, vfo_t, dcd_t, rig_ptr_t);
-	// typedef int (*pltune_cb_t)(RIG *, vfo_t, freq_t *, rmode_t *, pbwidth_t *, rig_ptr_t);
 
 	rig_set_debug_callback(rig_logger, nullptr);
 
@@ -411,51 +407,34 @@ RigControl::RigControl(HamLab::DataShare & pDataShareIn, const std::string & nam
 					pbwidth_t width = 0;
 					split_t split;
 					int satmode = 0;
-					// char buf[1024];
 
-					// int ret = rig_get_rig_info(m_rig, buf, sizeof(buf));
 					int retval = rig_get_vfo_info(m_rig, RIG_VFO_CURR, &freq, &mode, &width, &split, &satmode);
 
-					if (retval == RIG_OK) {
+					{
 						std::lock_guard lk(mtx);
-						jRigStatus["VFO"]["freq"] = freq;
-						jRigStatus["VFO"]["mode"] = mode;
-						jRigStatus["VFO"]["width"] = width;
-						jRigStatus["VFO"]["split"] = split;
-						jRigStatus["VFO"]["satmode"] = satmode;
+
+						if (retval == RIG_OK) {
+							std::lock_guard lk(mtx);
+							jRigStatus["VFO"]["freq"] = freq;
+							jRigStatus["VFO"]["mode"] = mode;
+							jRigStatus["VFO"]["width"] = width;
+							jRigStatus["VFO"]["split"] = split;
+							jRigStatus["VFO"]["satmode"] = satmode;
+						}
 					}
-
-					// retval = rig_get_vfo_info(m_rig, RIG_VFO_B, &freq, &mode, &width, &split, &satmode);
-
-					// if (retval == RIG_OK) {
-					// 	std::lock_guard lk(mtx);
-					// 	jRigStatus["VFO_B"]["freq"] = freq;
-					// 	jRigStatus["VFO_B"]["mode"] = mode;
-					// 	jRigStatus["VFO_B"]["width"] = width;
-					// 	jRigStatus["VFO_B"]["split"] = split;
-					// 	jRigStatus["VFO_B"]["satmode"] = satmode;
-					// }
-
-					// retval = rig_get_vfo_info(m_rig, RIG_VFO_CURR, &freq, &mode, &width, &split, &satmode);
-
-					// if (retval == RIG_OK) {
-					// 	std::lock_guard lk(mtx);
-					// 	jRigStatus["VFO_CURRENT"]["freq"] = freq;
-					// 	jRigStatus["VFO_CURRENT"]["mode"] = mode;
-					// 	jRigStatus["VFO_CURRENT"]["width"] = width;
-					// 	jRigStatus["VFO_CURRENT"]["split"] = split;
-					// 	jRigStatus["VFO_CURRENT"]["satmode"] = satmode;
-					// }
 
 					value_t strength;
 
 					const struct rig_caps * caps = m_rig->caps;
 
 					retval = rig_get_strength(m_rig, RIG_VFO_CURR, &strength);
+					{
+						std::lock_guard lk(mutexData.mtx);
 
-					if (retval == RIG_OK) {
-						std::lock_guard lk(mtx);
-						jRigStatus["strength"] = strength.i;
+						if (retval == RIG_OK) {
+							std::lock_guard lk(mtx);
+							jRigStatus["strength"] = strength.i;
+						}
 					}
 
 					if (caps->get_level != nullptr) {
@@ -558,6 +537,7 @@ bool RigControl::DrawSideBar(bool bOpen)
 {
 	static bool bPolledSettings = false;
 	static bool bSetSettings = false;
+	std::lock_guard lk(mutexData.mtx);
 	if (ImGui::CollapsingHeader("Rig Control", bOpen ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
 		if (ImGui::BeginCombo("Rig", jsonTypedRef<char *>(jLocalData["current_rig_name"]))) {
 			int i = 0;
@@ -617,7 +597,8 @@ bool RigControl::DrawSideBar(bool bOpen)
 
 			auto ext_func_callback = [](RIG * rig, const struct confparams * conf, rig_ptr_t pData)
 			{
-				ojson::document & jData = *(ojson::document *)pData;
+				RigConfData & data = *(RigConfData *)pData;
+				ojson::value & jData = data.jData;
 				jData[conf->name]["label"] = conf->label;
 				jData[conf->name]["dflt"] = conf->dflt;
 				jData[conf->name]["tooltip"] = conf->dflt;
@@ -683,13 +664,14 @@ bool RigControl::DrawSideBar(bool bOpen)
 				if (m_rig && !bPolledSettings) {
 					bPolledSettings = true;
 					RigConfData data {jLocalData["current_rig"]["available_settings"], m_rig};
-					// rig_ext_parm_foreach(rig, ext_func_callback, &jRigSettings);
+					RigConfData data1 {jLocalData["current_rig"]["available_settings"], m_rig};
+					RigConfData data2 {jLocalData["current_rig"]["available_settings"], m_rig};
 					rig_token_foreach(m_rig, ext_func_callback2, &data);
+					rig_ext_parm_foreach(m_rig, ext_func_callback, &data1);
+					rig_ext_func_foreach(m_rig, ext_func_callback, &data2);
 					for (auto & set : jLocalData["current_rig"]["settings"]) {
 						set["set"] = false;
 					}
-					// rig_ext_level_foreach(rig, ext_func_callback, &jRigSettings);
-					// rig_ext_func_foreach(rig, ext_func_callback, &jRigSettings);
 				}
 				for (auto & setting : jLocalData["current_rig"]["available_settings"]) {
 					auto & jCurrentSetting = jLocalData["current_rig"]["settings"][setting.key()];
@@ -793,6 +775,7 @@ bool RigControl::DrawSideBar(bool bOpen)
 
 void RigControl::DrawTab()
 {
+	std::lock_guard lk(mutexData.mtx);
 	ImGuiIO & io = ImGui::GetIO();
 	if (ImGui::BeginTabItem(name.c_str())) {
 		ImGui::BeginChild("RigTab_child");
