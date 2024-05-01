@@ -33,23 +33,23 @@ enum WSJT_X_Msg_Type
 
 class BinaryConverter {
 public:
-	BinaryConverter() {}
+	BinaryConverter() = default;
 
 	template <typename Iterator>
-	BinaryConverter(Iterator begin, Iterator end) : begin_(begin), it_(begin), end_(end) {}
+	BinaryConverter(Iterator beginIn, Iterator endIn) : begin(beginIn), it(beginIn), end(endIn) {}
 
 	// Copy constructor
-	BinaryConverter(const BinaryConverter& other) : begin_(other.begin_), it_(other.it_), end_(other.end_) {}
+	BinaryConverter(const BinaryConverter& other) : begin(other.begin), it(other.it), end(other.end) {}
 
 	// Move constructor
-	BinaryConverter(BinaryConverter&& other) noexcept : begin_(std::move(other.begin_)), it_(std::move(other.it_)), end_(std::move(other.end_)) {}
+	BinaryConverter(BinaryConverter&& other) noexcept : begin(other.begin), it(other.it), end(other.end) {}
 
 	// Copy assignment operator
 	BinaryConverter& operator=(const BinaryConverter& other) {
 		if (this != &other) {
-			begin_ = other.begin_;
-			it_ = other.it_;
-			end_ = other.end_;
+			begin = other.begin;
+			it = other.it;
+			end = other.end;
 		}
 		return *this;
 	}
@@ -57,9 +57,9 @@ public:
 	// Move assignment operator
 	BinaryConverter& operator=(BinaryConverter&& other) noexcept {
 		if (this != &other) {
-			begin_ = std::move(other.begin_);
-			it_ = std::move(other.it_);
-			end_ = std::move(other.end_);
+			begin = other.begin;
+			it = other.it;
+			end = other.end;
 		}
 		return *this;
 	}
@@ -87,9 +87,9 @@ public:
 		if (len == 0xFFFFFFFF || len == 0) {
 			return "";
 		}
-		HAMLIB_ASSERT(len <= static_cast<size_t>(std::distance(it_, end_)), "Bin2Str \"" + sCurrentTag + "\" (" + std::to_string(len) + " > " + std::to_string(std::distance(it_, end_)) + ")");
-		std::string ret(it_, it_ + len);
-		std::advance(it_, len);
+		HAMLIB_ASSERT(len <= static_cast<size_t>(std::distance(it, end)), "Bin2Str \"" + sCurrentTag + "\" (" + std::to_string(len) + " > " + std::to_string(std::distance(it, end)) + ")");
+		std::string ret(it, it + len);
+		std::advance(it, len);
 		// std::cerr << "String: " << ret << std::endl;
 		return ret;
 	}
@@ -100,19 +100,19 @@ public:
 		val = Bin2Str();
 	}
 
-	std::vector<unsigned char>::const_iterator begin()
+	[[nodiscard]] std::vector<unsigned char>::const_iterator Begin() const
 	{
-		return begin_;
+		return begin;
 	}
 
-	std::vector<unsigned char>::const_iterator current()
+	[[nodiscard]] std::vector<unsigned char>::const_iterator Current() const
 	{
-		return it_;
+		return it;
 	}
 
-	std::vector<unsigned char>::const_iterator end()
+	[[nodiscard]] std::vector<unsigned char>::const_iterator End() const
 	{
-		return end_;
+		return end;
 	}
 
 private:
@@ -134,10 +134,10 @@ private:
 		static_assert(std::is_integral_v<IntegralType>, "Only floating-point types are supported.");
 		IntegralType ret = 0;
 		// std::cout << boost::core::demangle(typeid(IntegralType).name()) << ": " << std::flush;
-		HAMLIB_ASSERT(sizeof(IntegralType) <= static_cast<size_t>(std::distance(it_, end_)), "Bin2Num<" + boost::core::demangle(typeid(IntegralType).name()) + "> \"" + sCurrentTag + "\" (" + std::to_string(sizeof(IntegralType)) + " > " + std::to_string(std::distance(it_, end_)) + ")");
+		HAMLIB_ASSERT(sizeof(IntegralType) <= static_cast<size_t>(std::distance(it, end)), "Bin2Num<" + boost::core::demangle(typeid(IntegralType).name()) + "> \"" + sCurrentTag + "\" (" + std::to_string(sizeof(IntegralType)) + " > " + std::to_string(std::distance(it, end)) + ")");
 		for (size_t i = 0; i < sizeof(IntegralType); ++i) {
 			ret = ret << 8;
-			ret |= *it_++;
+			ret |= *it++;
 		}
 		// std::cout << ret << std::endl;
 		return ret;
@@ -157,39 +157,39 @@ private:
 		ret.i = 0;
 		for (size_t i = 0; i < sizeof(FloatingPointType); ++i) {
 			ret.i = ret.i << 8;
-			ret.i |= *it_++;
+			ret.i |= *it++;
 		}
 		// std::cout << ret.f << std::endl;
 		return ret.f;
 	}
 
-	std::vector<unsigned char>::const_iterator begin_;
-	std::vector<unsigned char>::const_iterator it_;
-	std::vector<unsigned char>::const_iterator end_;
+	std::vector<unsigned char>::const_iterator begin;
+	std::vector<unsigned char>::const_iterator it;
+	std::vector<unsigned char>::const_iterator end;
 
 	std::string sCurrentTag{"Unknown"};
 };
 
 class BinarySerializer {
 public:
-	BinarySerializer() : data_(kInitialSize), end_(data_.begin()) {}
+	BinarySerializer() : data(kInitialSize), end(data.begin()) {}
 
 	// Copy constructor
-	BinarySerializer(BinarySerializer& other) : data_(other.data_), end_(data_.begin() + std::distance(other.data_.begin(), other.end_)) {}
+	BinarySerializer(BinarySerializer& other) : data(other.data), end(data.begin() + std::distance(other.data.begin(), other.end)) {}
 
 	// Move constructor
 	BinarySerializer(BinarySerializer&& other) noexcept
 	{
-		auto size = std::distance(other.data_.begin(), other.end_);
-		data_ = std::move(other.data_);
-		end_ = data_.begin() + size;
+		auto size = std::distance(other.data.begin(), other.end);
+		data = std::move(other.data);
+		end = data.begin() + size;
 	}
 
 	// Copy assignment operator
-	BinarySerializer& operator=(BinarySerializer& other) {
+	BinarySerializer& operator=(const BinarySerializer& other) {
 		if (this != &other) {
-			data_ = other.data_;
-			end_ = data_.begin() + std::distance(other.data_.begin(), other.end_);
+			data = other.data;
+			end = data.begin() + (other.data.begin() - other.end);
 		}
 		return *this;
 	}
@@ -197,9 +197,9 @@ public:
 	// Move assignment operator
 	BinarySerializer& operator=(BinarySerializer&& other) noexcept {
 		if (this != &other) {
-			auto size = std::distance(other.data_.begin(), other.end_);
-			data_ = std::move(other.data_);
-			end_ = data_.begin() + size;
+			auto size = std::distance(other.data.begin(), other.end);
+			data = std::move(other.data);
+			end = data.begin() + size;
 		}
 		return *this;
 	}
@@ -216,28 +216,28 @@ public:
 
 	void Str2Bin(const std::string& value) {
 		Num2Bin<uint32_t>(static_cast<uint32_t>(value.size()));
-		std::copy(value.begin(), value.end(), end_);
-		end_ += value.size();
+		std::ranges::copy(value, end);
+		end += static_cast<long>(value.size());
 	}
 
-	void shrink_to_fit() {
-		auto final_size = std::distance(data_.begin(), end_);
-		data_.resize(final_size);
-		end_ = data_.end();
+	void ShrinkToFit() {
+		auto final_size = std::distance(data.begin(), end);
+		data.resize(final_size);
+		end = data.end();
 	}
 
-	std::vector<unsigned char>::const_iterator begin() const {
-		return data_.begin();
+	[[nodiscard]] std::vector<unsigned char>::const_iterator Begin() const {
+		return data.begin();
 	}
 
-	std::vector<unsigned char>::const_iterator end() const {
-		return end_;
+	[[nodiscard]] std::vector<unsigned char>::const_iterator End() const {
+		return end;
 	}
 
 	auto & operator*()
 	{
-		shrink_to_fit();
-		return data_;
+		ShrinkToFit();
+		return data;
 	}
 
 private:
@@ -248,8 +248,8 @@ private:
 		static_assert(std::is_integral_v<IntegralType>, "Only integral types are supported.");
 		size_t size = sizeof(value);
 		value = Network::swapEndianness(value);
-		std::copy(reinterpret_cast<const unsigned char*>(&value), reinterpret_cast<const unsigned char*>(&value) + size, end_);
-		end_ += size;
+		std::copy_n(reinterpret_cast<const unsigned char*>(&value), size, end);
+		end += static_cast<long>(size);
 	}
 
 	template <typename FloatingPointType>
@@ -257,19 +257,19 @@ private:
 		static_assert(std::is_floating_point_v<FloatingPointType>, "Only floating-point types are supported.");
 		size_t size = sizeof(value);
 		value = Network::swapEndianness(value);
-		std::copy(reinterpret_cast<const unsigned char*>(&value), reinterpret_cast<const unsigned char*>(&value) + size, end_);
-		end_ += size;
+		std::copy_n(reinterpret_cast<const unsigned char*>(&value), size, end);
+		end += static_cast<long>(size);
 	}
 
-	std::vector<unsigned char> data_;
-	std::vector<unsigned char>::iterator end_{data_.begin()};
+	std::vector<unsigned char> data;
+	std::vector<unsigned char>::iterator end{data.begin()};
 };
 
 class WSJTXReceiver : public HamLab::PluginBase
 {
 	public:
 		WSJTXReceiver(HamLab::DataShareClass & pDataShareIn, const std::string & name_in);
-		~WSJTXReceiver();
+		~WSJTXReceiver() override;
 
 		bool DrawSideBar(bool bOpen) override;
 		void DrawTab() override;
@@ -292,13 +292,13 @@ class WSJTXReceiver : public HamLab::PluginBase
 		void ProcessMessage(std::size_t bytesReceived);
 		static json::document DecodeMessage(const std::vector<unsigned char> & vMessage);
 
-		static constexpr std::size_t max_length = 0x10000;
-		std::array<unsigned char, max_length> data_;
-		boost::asio::io_context io_context_;
-		std::thread io_thread_;
-		boost::asio::ip::udp::socket socket_{io_context_};
-		boost::asio::ip::udp::socket send_socket_{io_context_};
-		boost::asio::ip::udp::endpoint senderEndpoint_;
+		static constexpr std::size_t MaxLength = 0x10000;
+		std::array<unsigned char, MaxLength> data;
+		boost::asio::io_context ioc;
+		std::thread ioThread;
+		boost::asio::ip::udp::socket socket_{ioc};
+		boost::asio::ip::udp::socket send_socket_{ioc};
+		boost::asio::ip::udp::endpoint senderEndpoint;
 
 		std::recursive_mutex mtx;
 		json::document jHistory;
