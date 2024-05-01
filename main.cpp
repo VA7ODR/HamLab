@@ -40,10 +40,10 @@ class SampleWindow : public EasyAppBase
 	public:
 		SampleWindow() : EasyAppBase("sample", "Sample Window") {}
 
-		virtual void Start() override; // Optional.  This is where you would start threads, load things, etc. If it takes a long time, use a thread with THREAD instead of std::thread.
-		virtual void Render(bool * bShow) override;  // REQUIRED.  This is where you would render your window.
-		virtual void Stop() override; // This is where you would clean up, like joining threads.
-		virtual bool BuildsOwnWindow() override { return false; }  // Set this to true, if you want to have tighter control over the ImGui::Begin and ImGui::End calls. If set to False, EasyAppBase will handle it for you.
+		void Start() override; // Optional.  This is where you would start threads, load things, etc. If it takes a long time, use a thread with THREAD instead of std::thread.
+		void Render(bool * bShow) override;  // REQUIRED.  This is where you would render your window.
+		void Stop() override; // This is where you would clean up, like joining threads.
+		bool BuildsOwnWindow() override { return false; }  // Set this to true, if you want to have tighter control over the ImGui::Begin and ImGui::End calls. If set to False, EasyAppBase will handle it for you.
 
 	private:
 		Thread sampleThread;
@@ -126,6 +126,14 @@ int main(int, char**)
 
 	// Set the Main Renderer
 
+	std::string sPluginFolder;
+
+	if (std::filesystem::is_directory(GetAppDataFolder() + "/plugins")) {
+		sPluginFolder = GetAppDataFolder() + "/plugins";
+	} else if (std::filesystem::is_directory("./plugins")) {
+		sPluginFolder = "./plugins";
+	}
+	HamLab::DataShare data_share{GetAppDataFolder() + "/HamLabPluginSettings.json"};
 	HamLab::PluginLoader loader(sPluginFolder, data_share);
 
 	EasyAppBase::SetMainRenderer([&]() { MainRenderer(); });

@@ -143,7 +143,7 @@ int main(int, char**)
 
 	loader.LoadPlugin(Logger::create(loader.data_share(), "Logger"));
 
-	ojson::document jSettings = data_share.GetData("HamLabMain");
+	json::document jSettings = data_share.GetData("HamLabMain");
 
 	// Our state
 	// bool show_demo_window = jSettings["show_demo_window"].boolean();

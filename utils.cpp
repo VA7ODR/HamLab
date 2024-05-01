@@ -41,7 +41,7 @@ std::string GetAppDataFolder()
 #endif
 }
 
-void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bShow)
+void ShowJsonWindow(const std::string & sTitle, json::value & jData, bool & bShow)
 {
 	ImGui::Begin(sTitle.c_str(), &bShow);
 	// if (ImGui::TreeNode("Tree view")) {
@@ -58,13 +58,13 @@ void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bSh
 		ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_NoHide | ImGuiTableColumnFlags_WidthStretch);
 		ImGui::TableHeadersRow();
 
-		std::function<void(const std::string &, ojson::value &)> recursiveLambda = [&recursiveLambda](const std::string & sName, ojson::value & jValue) -> void
+		std::function<void(const std::string &, json::value &)> recursiveLambda = [&recursiveLambda](const std::string & sName, json::value & jValue) -> void
 		{
 			switch (jValue.isA()) {
-				case ojson::JSON_VOID:
+				case json::JSON_VOID:
 					return;
 
-				case ojson::JSON_NULL:
+				case json::JSON_NULL:
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TreeNodeEx(sName.c_str(), tree_node_flags | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_NoTreePushOnOpen);
@@ -80,7 +80,7 @@ void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bSh
 					ImGui::Text("null");
 					break;
 
-				case ojson::JSON_BOOLEAN:
+				case json::JSON_BOOLEAN:
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TreeNodeEx(sName.c_str(), tree_node_flags | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_NoTreePushOnOpen);
@@ -96,7 +96,7 @@ void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bSh
 					ImGui::Text("bool");
 					break;
 
-				case ojson::JSON_NUMBER:
+				case json::JSON_NUMBER:
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TreeNodeEx(sName.c_str(), tree_node_flags | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_NoTreePushOnOpen);
@@ -112,7 +112,7 @@ void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bSh
 					ImGui::Text("number");
 					break;
 
-				case ojson::JSON_STRING:
+				case json::JSON_STRING:
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TreeNodeEx(sName.c_str(), tree_node_flags | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_NoTreePushOnOpen);
@@ -128,7 +128,7 @@ void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bSh
 					ImGui::Text("string");
 					break;
 
-				case ojson::JSON_OBJECT:
+				case json::JSON_OBJECT:
 				{
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
@@ -149,7 +149,7 @@ void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bSh
 					break;
 				}
 
-				case ojson::JSON_ARRAY:
+				case json::JSON_ARRAY:
 				{
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
@@ -181,7 +181,7 @@ void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bSh
 	ImGui::End();
 }
 
-ojson::value ImVec4ToJSONArray(const ImVec4 & in)
+json::value ImVec4ToJSONArray(const ImVec4 & in)
 {
 	json::value ret;
 	ret[0] = in.x;
@@ -191,7 +191,7 @@ ojson::value ImVec4ToJSONArray(const ImVec4 & in)
 	return ret;
 }
 
-ImVec4 JSONArrayToImVec4(ojson::value & jData)
+ImVec4 JSONArrayToImVec4(json::value & jData)
 {
 	ImVec4 ret {0, 0, 0, 0};
 

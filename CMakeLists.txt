@@ -41,7 +41,7 @@ add_subdirectory(wsjtx)
 add_subdirectory(logger)
 add_subdirectory(rigctl)
 
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} main.cpp HamLabPlugin.hpp HamLabPlugin.cpp PluginLoader.cpp PluginLoader.hpp)
 target_link_libraries(${PROJECT_NAME} PRIVATE easy_app_base)
 
 #add_executable(HamLab main.cpp utils.hpp app_logger.cpp app_logger.hpp network.cpp network.cpp thread.cpp thread.hpp eventhandler.cpp eventhandler.hpp HamLabPlugin.hpp PluginLoader.hpp)

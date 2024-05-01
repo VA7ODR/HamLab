@@ -1,88 +1,53 @@
-	#pragma once
+#pragma once
 
-	#include "imgui.h"
-	#include "json.hpp"
-	#include "shared_recursive_mutex.hpp"
+#include "json.hpp"
+#include "shared_recursive_mutex.hpp"
 
-	#include <string>
+#include <string>
 
-	namespace HamLab
-	{
+namespace HamLab
+{
+	struct APIVersion {
+		constexpr APIVersion(int majorIn, int minorIn, int patchIn) : major(majorIn), minor(minorIn), patch(patchIn) {}
 
-		struct APIVersion {
-			constexpr APIVersion(int major, int minor, int patch) : major(major), minor(minor), patch(patch) {}
+		int major;
+		int minor;
+		int patch;
 
-			int major;
-			int minor;
-			int patch;
+		[[nodiscard]] const char* toString() const;
+	};
 
-			const char* toString() const {
-				const static std::string sVersion{std::to_string(major) + "." + std::to_string(minor) + "." + std::to_string(patch)};
-				return sVersion.c_str();
-			}
-		};
+	constexpr APIVersion CURRENT_API_VERSION{0, 0, 1};
 
-		constexpr APIVersion CURRENT_API_VERSION{0, 0, 1};
-
-		inline std::ostream & operator<<(std::ostream & os, const APIVersion & version)
-		{
-			os << version.toString();
-			return os;
-		}
-
+	std::ostream & operator<<(std::ostream & os, const APIVersion & version);
 
 	class DataShare
 	{
 		public:
-			DataShare(const std::string & sFileNameIn) : sFileName(sFileNameIn)
-			{
-				RecursiveExclusiveLock lock(mtx);
-				jData.parseFile(sFileName);
-			}
+			explicit DataShare(const std::string & sFileNameIn);
+			explicit DataShare(std::string && sFileNameIn);
+			~DataShare();
 
-			~DataShare()
-			{
-				jData.writeFile(sFileName, true);
-			}
-
-			ojson::value GetData(const std::string & sKey, ojson::value jDefault = ojson::value())
-			{
-				RecursiveExclusiveLock lock(mtx);
-				auto & jRet = jData[sKey];
-				if (jRet.IsVoid()) {
-					jRet = jDefault;
-				}
-				return jRet;
-			}
-
-			void SetData(const std::string & sKey, ojson::value & jValue)
-			{
-				RecursiveExclusiveLock lock(mtx);
-				jData[sKey] = jValue;
-			}
+			json::value GetData(const std::string & sKey, const json::value & jDefault);
+			json::value GetData(const std::string & sKey);
+			void SetData(const std::string & sKey, const json::value & jValue);
 
 		private:
 			SharedRecursiveMutex mtx;
 			std::string sFileName;
-			ojson::document jData;
+			json::document jData;
 	};
 
 	class PluginBase
 	{
 		public:
-			PluginBase(DataShare & data_share_in, const std::string & name_in) : data_share_(data_share_in), name(name_in)
-			{
-				jLocalData = data_share_.GetData(Name());
-			}
-
-			virtual ~PluginBase()
-			{
-				data_share_.SetData(Name(), jLocalData);
-			}
+			PluginBase(DataShare & data_share_in, const std::string & name_in);
+			PluginBase(DataShare & data_share_in, std::string && name_in);
+			virtual ~PluginBase();
 
 			constexpr const std::string & Name() { return name; }
 
-			const APIVersion * Version() { return &CURRENT_API_VERSION; }
+			static const APIVersion * Version() { return &CURRENT_API_VERSION; }
 
 			virtual void DrawTab() = 0;
 			virtual bool DrawSideBar(bool) = 0;
@@ -93,7 +58,6 @@
 		protected:
 			DataShare & data_share_;
 			std::string name;
-			ojson::document jLocalData;
+			json::document jLocalData;
 	};
-
-	} //HamLab
+} //HamLab
