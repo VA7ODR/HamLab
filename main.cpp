@@ -1,319 +1,144 @@
-#include "utils.hpp"
-#define IMGUI_USE_STL_BINDINGS
+/*
+Copyright (c) 2024 James Baker
 
-#include "imgui.h"
-#include "imgui_impl_sdl2.h"
-#include "backends/imgui_impl_opengl3.h"
-#include "json.hpp"
-#include "logger/logger.hpp"
-#include "PluginLoader.hpp"
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-#include <filesystem>
-#include <SDL.h>
-#include "SDL_opengl.h"
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
 
-#include <stdio.h>
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
-#if !SDL_VERSION_ATLEAST(2,0,17)
-#error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
+The official repository for this library is at https://github.com/VA7ODR/EasyAppBase
+
+*/
+
+
+#include "easyappbase.hpp"
+
+#if !defined APP_NAME
+#define APP_NAME "SampleApp"
 #endif
+#if !defined APP_VERSION_STRING
+#define APP_VERSION_STRING "0.0.0"
+#endif
+
+// Sample Window
+class SampleWindow : public EasyAppBase
+{
+	public:
+		SampleWindow() : EasyAppBase("sample", "Sample Window") {}
+
+		virtual void Start() override; // Optional.  This is where you would start threads, load things, etc. If it takes a long time, use a thread with THREAD instead of std::thread.
+		virtual void Render(bool * bShow) override;  // REQUIRED.  This is where you would render your window.
+		virtual void Stop() override; // This is where you would clean up, like joining threads.
+		virtual bool BuildsOwnWindow() override { return false; }  // Set this to true, if you want to have tighter control over the ImGui::Begin and ImGui::End calls. If set to False, EasyAppBase will handle it for you.
+
+	private:
+		Thread sampleThread;
+		SharedRecursiveMutex m_mutex;
+		int iCount = 0;
+		int iButtonCount = 0;
+		EventHandler::Event buttonEvent = CreateEvent("ButtonEvent", EventHandler::auto_reset);
+		EventHandler::Event stopEvent = CreateEvent("ButtonEvent", EventHandler::manual_reset);
+};
+
+void SampleWindow::Start()
+{
+	sampleThread = THREAD("SampleThread", [&](std::stop_token stoken)
+	{
+		bool bRun = true;
+		while (!stoken.stop_requested() && bRun) {
+			int iEventIndex = EventHandlerWait({buttonEvent, stopEvent}, 1000ms);
+			switch (iEventIndex) {
+				case 0:
+				{
+					RecursiveSharedLock lock(m_mutex);
+					iButtonCount++;
+					Log(AppLogger::INFO) << "Button Count: " << iButtonCount;
+					break;
+				}
+
+				case 1:
+				{
+				   bRun = false;
+				   Log(AppLogger::INFO) << "Exit Event.";
+				   break;
+				}
+
+			   case EventHandler::TIMEOUT:
+			   {
+				   RecursiveExclusiveLock lock(m_mutex);
+				   iCount++;
+				   Log(AppLogger::INFO) << "Timeout Count: " << iCount;
+				   break;
+			   }
+
+			   case EventHandler::EXIT_ALL:
+			   {
+				   bRun = false;
+				   Log(AppLogger::INFO) << "EventHandler::ExitAll Event.";
+				   break;
+			   }
+			}
+		}
+		Log(AppLogger::INFO) << "SampleThread Exited.";
+	});
+}
+
+void SampleWindow::Stop()
+{
+	EventHandler::Set(stopEvent);
+}
+
+// Sample Window Render
+void SampleWindow::Render(bool * bShow)
+{
+	ImGui::Text("Sample Window");
+	ImGui::Text("Button Count: %d", iButtonCount);
+	ImGui::Text("Timeout Count: %d", iCount);
+	if (ImGui::Button("Button")) {
+		EventHandler::Set(buttonEvent);
+	}
+}
+
+void MainRenderer()
+{
+	ImGui::Text("Hello, World!");
+}
 
 // Main code
 int main(int, char**)
 {
-	// Setup SDL
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0)
-	{
-		printf("Error: %s\n", SDL_GetError());
-		return -1;
-	}
+	// Register the Sample Window
+	// EasyAppBase::GenerateWindow<SampleWindow>();
 
-	// Decide GL+GLSL versions
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-	// GL ES 2.0 + GLSL 100
-	const char *glsl_version = "#version 100";
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-#elif defined(__APPLE__)
-	// GL 3.2 Core + GLSL 150
-	const char *glsl_version = "#version 150";
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS,
-						SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG); // Always required on Mac
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-#else
-	// GL 3.0 + GLSL 130
-	const char *glsl_version = "#version 130";
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-#endif
+	// Set the Main Renderer
+	EasyAppBase::SetMainRenderer([&]() { MainRenderer(); });
 
-	// From 2.0.18: Enable native IME.
-#ifdef SDL_HINT_IME_SHOW_UI
-	SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
-#endif
+	// Uncomment the following lines to enable/disable features
 
-	// Create window with graphics context
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-	SDL_WindowFlags window_flags = (SDL_WindowFlags) (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
-													  | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_SHOWN
-													  | SDL_WINDOW_MAXIMIZED);
+	// EasyAppBase::DisableDemo(true); // Uncomment this to disable the ImGui Demo Window
 
-	// From 2.0.18: Enable native IME.
-#ifdef SDL_HINT_IME_SHOW_UI
-	SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
-#endif
+	// EasyAppBase::DisableDocking(true); // Uncomment this to disable docking (see https://github.com/ocornut/imgui/issues/2109 for details)
 
-	// Create window
-	SDL_Window* window = SDL_CreateWindow((std::string("HamLab v") + HamLab::CURRENT_API_VERSION.toString()).c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1080, window_flags);
-	if (window == nullptr)
-	{
-		printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
-		return -1;
-	}
+	// EasyAppBase::DisableViewports(true); // Uncomment this to disable viewports (see https://github.com/ocornut/imgui/issues/1542 for details)
 
-	SDL_GLContext gl_context = SDL_GL_CreateContext(window);
-	SDL_GL_MakeCurrent(window, gl_context);
+	// EasyAppBase::DisableGUI(true); // Uncomment this and the following line to disable the GUI entirely
+	// Thread killEasyAppThread = THREAD("Kill Thread", [](std::stop_token /*stoken*/) { std::this_thread::sleep_for(5s); EasyAppBase::ExitAll(); }); // Uncomment this example to exit the application after 5 seconds when no gui is present.
 
-	HamLab::DataShare data_share{GetAppDataFolder() + "/HamLab.json"};
+	// EasyAppBase::SetNetworkThreads(4); // Uncomment this to set the number of network threads to 4. 0 or less is no network. Default is 0.
 
-	std::string sPluginFolder;
-
-	if (std::filesystem::is_directory(GetAppDataFolder() + "/plugins")) {
-		sPluginFolder = GetAppDataFolder() + "/plugins";
-	} else if (std::filesystem::is_directory("./plugins")) {
-		sPluginFolder = "./plugins";
-	}
-
-	// Setup Dear ImGui context
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGuiIO & io = ImGui::GetIO();
-
-	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 12);
-	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 16);
-	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 18);
-	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 24);
-	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 36);
-	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 48);
-	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 64);
-	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/hack/Hack-Regular.ttf", 72);
-	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/liquid_crystal/LiquidCrystal-Normal.otf", 18);
-	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/liquid_crystal/LiquidCrystal-Normal.otf", 36);
-	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/liquid_crystal/LiquidCrystal-Normal.otf", 72);
-	io.Fonts->AddFontFromFileTTF("/home/jim/Downloads/liquid_crystal/LiquidCrystal-Normal.otf", 144);
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;	  // Enable Keyboard Controls
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-
-	auto & style = ImGui::GetStyle();
-
-	style.DisplayWindowPadding = {0, 0};
-
-	style.WindowRounding = 8.0;
-	style.ChildRounding = 8.0;
-	style.FrameRounding = 8.0;
-	style.PopupRounding = 8.0;
-	style.ScrollbarRounding = 8.0;
-	style.GrabRounding = 8.0;
-	style.TabRounding = 6.0;
-
-	style.WindowBorderSize = 1.0;
-	style.ChildBorderSize = 1.0;
-	style.PopupBorderSize = 1.0;
-	style.FrameBorderSize = 1.0;
-	style.TabBorderSize = 1.0;
-
-	// Setup Dear ImGui style
-	ImGui::StyleColorsDark();
-
-	// Setup Platform/Renderer backends
-	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
-	ImGui_ImplOpenGL3_Init(glsl_version);
-
-	// io.Fonts->AddFontDefault();
-
-	HamLab::PluginLoader loader(sPluginFolder, data_share);
-
-	loader.LoadPlugin(Logger::create(loader.data_share(), "Logger"));
-
-	ojson::document jSettings = data_share.GetData("HamLabMain");
-
-	// Our state
-	// bool show_demo_window = jSettings["show_demo_window"].boolean();
-
-	if (!jSettings.exists("vsync")) {
-		jSettings["vsync"] = true;
-	}
-
-	size_t iFontIndex = 3;
-	if (jSettings.exists("default_font")) {
-		iFontIndex = jSettings["default_font"]._size_t();
-	}
-
-	io.FontDefault = io.Fonts->Fonts[iFontIndex];
-
-	if (jSettings.exists("chosen_colours")) {
-		ImVec4 * colors = ImGui::GetStyle().Colors;
-		for (int i = 0; i < ImGuiCol_COUNT; ++i) {
-			colors[i] = JSONArrayToImVec4(jSettings["chosen_colours"][i]);
-		}
-	}
-
-	bool bShowSettingsJSON = jSettings["jsow_settings_json"].boolean();
-
-	// Main loop
-	bool done = false;
-
-	while (!done) {
-		SDL_Event event;
-		while (SDL_PollEvent(&event)) {
-			ImGui_ImplSDL2_ProcessEvent(&event);
-			if (event.type == SDL_QUIT) {
-				done = true;
-			}
-			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) {
-				done = true;
-			}
-		}
-
-		ImGui_ImplOpenGL3_NewFrame();
-		ImGui_ImplSDL2_NewFrame();
-		ImGui::NewFrame();
-
-		int windowWidth, windowHeight;
-		SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-
-		ImVec2 sidebarSize(windowWidth, static_cast<float>(windowHeight));
-		ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
-		ImGui::SetNextWindowSize(sidebarSize); // Set the width to 1/5th of the window width
-
-		ImGui::Begin("HamLab", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDecoration);
-
-		ImGui::PushStyleColor(ImGuiCol_Border, ImGui::GetStyleColorVec4(ImGuiCol_Border));
-		style.Colors[ImGuiCol_Border] = style.Colors[ImGuiCol_BorderShadow] = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
-		ImGui::BeginTable("Main", 2, ImGuiTableFlags_Resizable);
-
-		ImGui::TableSetupColumn("SideBar", ImGuiTableColumnFlags_WidthStretch, windowWidth * 0.2);
-		ImGui::TableSetupColumn("Tabs", ImGuiTableColumnFlags_WidthStretch, windowWidth * 0.8);
-
-		ImGui::TableNextRow();
-		ImGui::PopStyleColor();
-		ImGui::TableSetColumnIndex(0);
-		ImGui::BeginChild("sidebar_child", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY);
-		loader.CallDrawSideBarFunctions();
-
-		if (ImGui::CollapsingHeader("HamLab General Settings", jSettings["general_open"].boolean() ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
-			jSettings["general_open"] = true;
-
-			ImFont * font_current = ImGui::GetFont();
-			if (ImGui::BeginCombo("Font", font_current->GetDebugName())) {
-				size_t iIndex = 0;
-				for (ImFont * font : io.Fonts->Fonts) {
-					ImGui::PushID((void *)font);
-					if (ImGui::Selectable(font->GetDebugName(), font == font_current)) {
-						io.FontDefault = font;
-						iFontIndex = iIndex;
-					}
-					ImGui::PopID();
-					++iIndex;
-				}
-				ImGui::EndCombo();
-			}
-
-			ImGui::ShowStyleSelector("Select Style");
-
-			ImGui::Checkbox("Demo Window", jsonTypedRef<bool>(jSettings["show_demo_window"])); // Edit bools storing our window open/close state
-			ImGui::Checkbox("Show Settings", &bShowSettingsJSON);
-
-			if (bShowSettingsJSON) {
-				ShowJsonWindow("HamLab Settings", jSettings, bShowSettingsJSON);
-			}
-
-			ImGui::Checkbox("VSync", jsonTypedRef<bool>(jSettings["vsync"]));
-			if (jSettings["vsync"].boolean()) {
-				SDL_GL_SetSwapInterval(1);
-			} else {
-				SDL_GL_SetSwapInterval(0);
-			}
-			ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-
-		} else {
-			jSettings["general_open"] = false;
-		}
-
-		ImGui::EndChild();
-
-		ImGui::TableSetColumnIndex(1);
-
-		ImGui::BeginChild("tab_child", ImVec2(0, 0), ImGuiChildFlags_Border | ImGuiChildFlags_FrameStyle);
-		if (ImGui::BeginTabBar("Tabs")) {
-			loader.CallDrawTabFunctions();
-			ImGui::EndTabBar();
-		}
-		ImGui::EndChild();
-
-		ImGui::EndTable();
-
-		ImGui::End();
-
-		if (jSettings["show_demo_window"].boolean()) {
-			ImGui::ShowDemoWindow(jsonTypedRef<bool>(jSettings["show_demo_window"]));
-		}
-
-		// Rendering
-		ImGui::Render();
-		auto bg_col = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
-		glViewport(0, 0, (int) io.DisplaySize.x, (int) io.DisplaySize.y);
-		glClearColor(bg_col.x * bg_col.w, bg_col.y * bg_col.w, bg_col.z * bg_col.w, bg_col.w);
-		glClear(GL_COLOR_BUFFER_BIT);
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-		// Update and Render additional Platform Windows
-		// (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste this code elsewhere.
-		//  For this specific demo app we could also call SDL_GL_MakeCurrent(window, gl_context) directly)
-		// if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-		// 	SDL_Window *backup_current_window = SDL_GL_GetCurrentWindow();
-		// 	SDL_GLContext backup_current_context = SDL_GL_GetCurrentContext();
-		// 	ImGui::UpdatePlatformWindows();
-		// 	ImGui::RenderPlatformWindowsDefault();
-		// 	SDL_GL_MakeCurrent(backup_current_window, backup_current_context);
-		// }
-
-		SDL_GL_SwapWindow(window);
-	}
-
-	// receiver.Stop();
-
-	// Our state
-	// jSettings["show_demo_window"] = show_demo_window;
-	jSettings["default_font"] = iFontIndex;
-
-	{
-		ImVec4 * colors = ImGui::GetStyle().Colors;
-		for (int i = 0; i < ImGuiCol_COUNT; ++i) {
-			jSettings["chosen_colours"][i] = ImVec4ToJSONArray(colors[i]);
-		}
-	}
-
-	jSettings["jsow_settings_json"] = bShowSettingsJSON;
-
-	data_share.SetData("HamLabMain", jSettings);
-
-	// Cleanup
-	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplSDL2_Shutdown();
-	ImGui::DestroyContext();
-
-	SDL_GL_DeleteContext(gl_context);
-	SDL_DestroyWindow(window);
-	SDL_Quit();
-
-	return 0;
+	// Run the application
+	return EasyAppBase::Run(APP_NAME, APP_NAME " v" APP_VERSION_STRING);
 }

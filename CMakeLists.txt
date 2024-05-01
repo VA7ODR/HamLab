@@ -13,31 +13,40 @@ if (ADDRESSSANITIZER)
          set(ADDRESSSANITIZERFLAGS " -fsanitize=address -fno-omit-frame-pointer ")
 endif(ADDRESSSANITIZER)
 
-set(CMAKE_CXX_FLAGS                " ${CMAKE_CXX_FLAGS_INIT} ${ADDRESSSANITIZERFLAGS} -fPIC -rdynamic ")
+set(CMAKE_CXX_FLAGS " ${CMAKE_CXX_FLAGS_INIT} ${ADDRESSSANITIZERFLAGS} -fPIC -rdynamic ")
 
-add_subdirectory(json)
-add_subdirectory(shared_recursive_mutex)
-
-find_package(SDL2 REQUIRED CONFIG REQUIRED COMPONENTS SDL2)
-find_package(SDL2 REQUIRED CONFIG COMPONENTS SDL2main)
+find_package(SDL2 REQUIRED)
 find_package(Boost REQUIRED filesystem system url)
 find_package(OpenGL REQUIRED)
+find_package(OpenSSL REQUIRED)
 
-add_compile_definitions(SUPPORT_ORDERED_JSON)
+set (SOURCE_DIR_DEFINITION SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 
-include_directories(json shared_recursive_mutex imgui imgui/backends ${SDL2_INCLUDE_DIRS} ${OPENGL_INCLUDE_DIR} magic_enum/include)
+add_compile_definitions(APP_NAME="${PROJECT_NAME}" APP_VERSION_STRING="1.0.0" ${SOURCE_DIR_DEFINITION} SUPPORT_ORDERED_JSON)
 
-add_library(imgui STATIC imgui/imgui.cpp imgui/imgui_demo.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp imgui/imgui_widgets.cpp imgui/backends/imgui_impl_sdl2.cpp imgui/backends/imgui_impl_opengl3.cpp)
-
-add_library(utils STATIC utils.cpp utils.hpp)
+add_subdirectory(EasyAppBase)
+include_directories(EasyAppBase
+        EasyAppBase/shared_recursive_mutex
+        EasyAppBase/imgui
+        EasyAppBase/imgui/backends
+        EasyAppBase/json_document
+        EasyAppBase/json_document/ArbitraryOrderMap
+        EasyAppBase/json_document/SDString
+        ${SDL2_INCLUDE_DIRS}
+        ${OPENGL_INCLUDE_DIR}
+        ${OPENSSL_INCLUDE_DIR}
+)
 
 add_subdirectory(wsjtx)
 add_subdirectory(logger)
 add_subdirectory(rigctl)
 
-add_executable(HamLab main.cpp utils.hpp app_logger.cpp app_logger.hpp network.cpp network.cpp thread.cpp thread.hpp eventhandler.cpp eventhandler.hpp HamLabPlugin.hpp PluginLoader.hpp)
-if(TARGET SDL2::SDL2main)
-    target_link_libraries(HamLab PRIVATE SDL2::SDL2main)
-endif()
-target_link_libraries(HamLab PRIVATE json_document imgui utils logger crypto ssl SDL2::SDL2 OpenGL::GL Boost::filesystem Boost::system Boost::url)
+add_executable(${PROJECT_NAME} main.cpp)
+target_link_libraries(${PROJECT_NAME} PRIVATE easy_app_base)
+
+#add_executable(HamLab main.cpp utils.hpp app_logger.cpp app_logger.hpp network.cpp network.cpp thread.cpp thread.hpp eventhandler.cpp eventhandler.hpp HamLabPlugin.hpp PluginLoader.hpp)
+#if(TARGET SDL2::SDL2main)
+#    target_link_libraries(HamLab PRIVATE SDL2::SDL2main)
+#endif()
+#target_link_libraries(HamLab PRIVATE json_document imgui utils logger crypto ssl SDL2::SDL2 OpenGL::GL Boost::filesystem Boost::system Boost::url)
 
