@@ -1,99 +1,99 @@
-#pragma once
+	#pragma once
 
-#include "imgui.h"
-#include "json.hpp"
-#include "shared_recursive_mutex.hpp"
+	#include "imgui.h"
+	#include "json.hpp"
+	#include "shared_recursive_mutex.hpp"
 
-#include <string>
+	#include <string>
 
-namespace HamLab
-{
+	namespace HamLab
+	{
 
-	struct APIVersion {
-		constexpr APIVersion(int major, int minor, int patch) : major(major), minor(minor), patch(patch) {}
+		struct APIVersion {
+			constexpr APIVersion(int major, int minor, int patch) : major(major), minor(minor), patch(patch) {}
 
-		int major;
-		int minor;
-		int patch;
+			int major;
+			int minor;
+			int patch;
 
-		const char* toString() const {
-			const static std::string sVersion{std::to_string(major) + "." + std::to_string(minor) + "." + std::to_string(patch)};
-			return sVersion.c_str();
+			const char* toString() const {
+				const static std::string sVersion{std::to_string(major) + "." + std::to_string(minor) + "." + std::to_string(patch)};
+				return sVersion.c_str();
+			}
+		};
+
+		constexpr APIVersion CURRENT_API_VERSION{0, 0, 1};
+
+		inline std::ostream & operator<<(std::ostream & os, const APIVersion & version)
+		{
+			os << version.toString();
+			return os;
 		}
+
+
+	class DataShare
+	{
+		public:
+			DataShare(const std::string & sFileNameIn) : sFileName(sFileNameIn)
+			{
+				RecursiveExclusiveLock lock(mtx);
+				jData.parseFile(sFileName);
+			}
+
+			~DataShare()
+			{
+				jData.writeFile(sFileName, true);
+			}
+
+			ojson::value GetData(const std::string & sKey, ojson::value jDefault = ojson::value())
+			{
+				RecursiveExclusiveLock lock(mtx);
+				auto & jRet = jData[sKey];
+				if (jRet.IsVoid()) {
+					jRet = jDefault;
+				}
+				return jRet;
+			}
+
+			void SetData(const std::string & sKey, ojson::value & jValue)
+			{
+				RecursiveExclusiveLock lock(mtx);
+				jData[sKey] = jValue;
+			}
+
+		private:
+			SharedRecursiveMutex mtx;
+			std::string sFileName;
+			ojson::document jData;
 	};
 
-	constexpr APIVersion CURRENT_API_VERSION{0, 0, 1};
-
-	inline std::ostream & operator<<(std::ostream & os, const APIVersion & version)
+	class PluginBase
 	{
-		os << version.toString();
-		return os;
-	}
-
-
-class DataShare
-{
-	public:
-		DataShare(const std::string & sFileNameIn) : sFileName(sFileNameIn)
-		{
-			RecursiveExclusiveLock lock(mtx);
-			jData.parseFile(sFileName);
-		}
-
-		~DataShare()
-		{
-			jData.writeFile(sFileName, true);
-		}
-
-		ojson::value GetData(const std::string & sKey, ojson::value jDefault = ojson::value())
-		{
-			RecursiveExclusiveLock lock(mtx);
-			auto & jRet = jData[sKey];
-			if (jRet.IsVoid()) {
-				jRet = jDefault;
+		public:
+			PluginBase(DataShare & data_share_in, const std::string & name_in) : data_share_(data_share_in), name(name_in)
+			{
+				jLocalData = data_share_.GetData(Name());
 			}
-			return jRet;
-		}
 
-		void SetData(const std::string & sKey, ojson::value & jValue)
-		{
-			RecursiveExclusiveLock lock(mtx);
-			jData[sKey] = jValue;
-		}
+			virtual ~PluginBase()
+			{
+				data_share_.SetData(Name(), jLocalData);
+			}
 
-	private:
-		SharedRecursiveMutex mtx;
-		std::string sFileName;
-		ojson::document jData;
-};
+			constexpr const std::string & Name() { return name; }
 
-class PluginBase
-{
-	public:
-		PluginBase(DataShare & data_share_in, const std::string & name_in) : data_share_(data_share_in), name(name_in)
-		{
-			jLocalData = data_share_.GetData(Name());
-		}
+			const APIVersion * Version() { return &CURRENT_API_VERSION; }
 
-		virtual ~PluginBase()
-		{
-			data_share_.SetData(Name(), jLocalData);
-		}
+			virtual void DrawTab() = 0;
+			virtual bool DrawSideBar(bool) = 0;
 
-		constexpr const std::string & Name() { return name; }
+			virtual bool ShowTab() { return true; }
+			virtual bool ShowSideBar() { return true; }
 
-		const APIVersion * Version() { return &CURRENT_API_VERSION; }
+		protected:
+			DataShare & data_share_;
+			std::string name;
+			ojson::document jLocalData;
+	};
 
-		virtual void DrawTab() = 0;
-		virtual bool DrawSideBar(bool) = 0;
-
-		virtual bool ShowTab() { return true; }
-		virtual bool ShowSideBar() { return true; }
-
-	protected:
-		DataShare & data_share_;
-		std::string name;
-		ojson::document jLocalData;
-};
-
-} //HamLab
+	} //HamLab

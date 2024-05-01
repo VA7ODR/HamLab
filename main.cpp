@@ -25,6 +25,7 @@ The official repository for this library is at https://github.com/VA7ODR/EasyApp
 
 
 #include "easyappbase.hpp"
+#include "PluginLoader.hpp"
 
 #if !defined APP_NAME
 #define APP_NAME "SampleApp"
@@ -124,6 +125,9 @@ int main(int, char**)
 	// EasyAppBase::GenerateWindow<SampleWindow>();
 
 	// Set the Main Renderer
+
+	HamLab::PluginLoader loader(sPluginFolder, data_share);
+
 	EasyAppBase::SetMainRenderer([&]() { MainRenderer(); });
 
 	// Uncomment the following lines to enable/disable features
