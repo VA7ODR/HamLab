@@ -12,30 +12,30 @@ namespace HamLab
 	class PluginLoader
 	{
 	public:
-		typedef PluginBase*(CreatePluginFunc)(DataShare &, const std::string&);
+		typedef PluginBase*(CreatePluginFunc)(DataShareClass &, const std::string&);
 
-		PluginLoader(const std::string & pluginDir, DataShare & data_share_in);
-		PluginLoader(std::string && pluginDir, DataShare & data_share_in);
+		PluginLoader(const std::string & pluginDir, DataShareClass & data_share_in);
+		PluginLoader(std::string && pluginDir, DataShareClass & data_share_in);
 		~PluginLoader();
 
 		void CallDrawSideBarFunctions();
 		void CallDrawTabFunctions();
 
-		[[nodiscard]] DataShare & data_share() const { return data_share_; }
+		[[nodiscard]] DataShareClass & DataShare() const { return dataShare; }
 
 		void LoadPlugin(PluginBase * pPlugin);
 
 	private:
 		void LoadPlugins();
 		void UnloadPlugins();
-		void LoadPlugin(const std::string &path);
+		void LoadPlugin(const std::string & Sath);
 
-		DataShare &data_share_;
+		DataShareClass &dataShare;
 		json::document jLocalData;
-		std::string pluginDir_;
-		std::map<std::string, bool> all_plugins_do_load_;
-		std::map<std::string, APIVersion> all_plugins_versions_;
-		std::map<std::string, boost::dll::shared_library> all_plugins_;
-		std::map<std::string, PluginBase*> loaded_plugins_;
+		std::string pluginDir;
+		std::map<std::string, bool> allPluginsDoLoad;
+		std::map<std::string, APIVersion> allPluginsVersions;
+		std::map<std::string, boost::dll::shared_library> allPlugins;
+		std::map<std::string, PluginBase*> loadedPlugins;
 	};
 }

@@ -133,7 +133,7 @@ int main(int, char**)
 	} else if (std::filesystem::is_directory("./plugins")) {
 		sPluginFolder = "./plugins";
 	}
-	HamLab::DataShare data_share{GetAppDataFolder() + "/HamLabPluginSettings.json"};
+	HamLab::DataShareClass data_share{GetAppDataFolder() + "/HamLabPluginSettings.json"};
 	HamLab::PluginLoader loader(sPluginFolder, data_share);
 
 	EasyAppBase::SetMainRenderer([&]() { MainRenderer(); });

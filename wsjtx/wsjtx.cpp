@@ -2,10 +2,10 @@
 #include "utils.hpp"
 #include <boost/dll/alias.hpp>
 
-WSJTXReceiver::WSJTXReceiver(HamLab::DataShare &pDataShareIn, const std::string &name_in) :
+WSJTXReceiver::WSJTXReceiver(HamLab::DataShareClass &pDataShareIn, const std::string &name_in) :
 	HamLab::PluginBase(pDataShareIn, name_in)
 {
-	std::cout << "WSJTXReceiver(" << name << ")" << std::endl;
+	std::cout << "WSJTXReceiver(" << sName << ")" << std::endl;
 
 	if (!jLocalData.exists("send_address")) {
 		jLocalData["send_address"] = "127.0.0.1";
@@ -60,8 +60,8 @@ bool WSJTXReceiver::DrawSideBar(bool bOpen)
 
 void WSJTXReceiver::DrawTab()
 {
-	if (ImGui::BeginTabItem(name.c_str())) {
-		ojson::document jLocalHistory = history();
+	if (ImGui::BeginTabItem(sName.c_str())) {
+		json::document jLocalHistory = history();
 		int id = 0;
 		if (jLocalHistory["Status"]["tx_enabled"].boolean()) {
 			ImGui::PushID(id++);
@@ -115,7 +115,7 @@ void WSJTXReceiver::DrawTab()
 		}
 
 		jLocalHistory["Decode"].sort(
-			[](ojson::value & a, ojson::value & b)
+			[](json::value & a, json::value & b)
 		{
 			bool bTimeEqual = a["time"] == b["time"];
 			if (bTimeEqual) {
@@ -191,7 +191,7 @@ void WSJTXReceiver::DrawTab()
 	}
 }
 
-HamLab::PluginBase *WSJTXReceiver::create(HamLab::DataShare &data_share_, const std::string &name)
+HamLab::PluginBase *WSJTXReceiver::create(HamLab::DataShareClass &data_share_, const std::string &name)
 {
 	return new WSJTXReceiver(data_share_, name);
 }
@@ -225,13 +225,13 @@ void WSJTXReceiver::Stop() {
 	io_context_.restart();
 }
 
-ojson::document WSJTXReceiver::history()
+json::document WSJTXReceiver::history()
 {
 	std::lock_guard<std::recursive_mutex> lk(mtx);
 	return jHistory;
 }
 
-void WSJTXReceiver::SendReply(ojson::document & jData)
+void WSJTXReceiver::SendReply(json::document & jData)
 {
 	BinarySerializer binarySerializer;
 	binarySerializer.Num2Bin(static_cast<uint32_t>(2914831322L));
@@ -279,7 +279,7 @@ void WSJTXReceiver::Send(const std::vector<unsigned char> &data) {
 }
 
 void WSJTXReceiver::StartReceive() {
-	std::cout << name << ": StartReceive." << std::endl;
+	std::cout << sName << ": StartReceive." << std::endl;
 	socket_.async_receive_from(boost::asio::buffer(data_), senderEndpoint_, [this](const boost::system::error_code& error, std::size_t bytesReceived)
 	{
 		if (!error) {
@@ -302,13 +302,13 @@ void WSJTXReceiver::ProcessMessage(std::size_t bytesReceived) {
 	std::lock_guard<std::recursive_mutex> lk(mtx);
 	std::string sType = jData["type_name"].string();
 	if (sType == "Status") {
-		auto jLoggerData = data_share_.GetData("logger_data");
+		auto jLoggerData = dataShare.GetData("logger_data");
 		jLoggerData["call"] = jData["call"];
 		jLoggerData["de_grid"] = jData["de_grid"];
 		jLoggerData["dx_call"] = jData["dx_call"];
 		jLoggerData["dx_grid"] = jData["dx_grid"];
 		jLoggerData["freq"] = jData["freq"] / 1000000.0;
-		data_share_.SetData("logger_data", jLoggerData);
+		dataShare.SetData("logger_data", jLoggerData);
 		jHistory[sType] = jData;
 	} else {
 		auto & jTypeHistory = jHistory[sType];
@@ -325,9 +325,9 @@ void WSJTXReceiver::ProcessMessage(std::size_t bytesReceived) {
 	std::cout << "Received message size: " << message.size() << " bytes" << std::endl;
 }
 
-ojson::document WSJTXReceiver::DecodeMessage(const std::vector<unsigned char> & vMessage)
+json::document WSJTXReceiver::DecodeMessage(const std::vector<unsigned char> & vMessage)
 {
-	ojson::document jRet;
+	json::document jRet;
 
 	jRet["type_name"] = "Unknown";
 
@@ -337,7 +337,7 @@ ojson::document WSJTXReceiver::DecodeMessage(const std::vector<unsigned char> & 
 		return jRet;
 	}
 
-	std::cout << Pretty(vMessage) << std::endl;
+	std::cout << PrettyHex(vMessage) << std::endl;
 
 	BinaryConverter binaryConverter(vMessage.begin(), vMessage.end());
 
@@ -507,18 +507,18 @@ ojson::document WSJTXReceiver::DecodeMessage(const std::vector<unsigned char> & 
 		}
 
 		if (binaryConverter.current() != binaryConverter.end()) {
-			jRet["remaining"] = Pretty({binaryConverter.begin(), binaryConverter.end()});
+			jRet["remaining"] = PrettyHex({binaryConverter.begin(), binaryConverter.end()});
 		}
 	} catch (const HamLabException& e) {
 		std::cerr << "WSJTXReceiver Error decoding " << jRet["type_name"].string() << "message:" << std::endl;
 		std::cerr << "    What: " << e.what() << std::endl;
-		std::cerr << "    Done: " << Pretty({binaryConverter.begin(), binaryConverter.current()}) << std::endl;
-		std::cerr << "    Left: " << Pretty({binaryConverter.current(), binaryConverter.end()}) << std::endl;
+		std::cerr << "    Done: " << PrettyHex({binaryConverter.begin(), binaryConverter.current()}) << std::endl;
+		std::cerr << "    Left: " << PrettyHex({binaryConverter.current(), binaryConverter.end()}) << std::endl;
 		std::cerr << "    JSON:\n" << jRet.write(true) << std::endl;
 		jRet["error"] = "WSJTXReceiver Error decoding " + jRet["type_name"].string();
 		jRet["what"] = e.what();
-		jRet["done"] = Pretty({binaryConverter.begin(), binaryConverter.current()});
-		jRet["left"] = Pretty({binaryConverter.current(), binaryConverter.end()});
+		jRet["done"] = PrettyHex({binaryConverter.begin(), binaryConverter.current()});
+		jRet["left"] = PrettyHex({binaryConverter.current(), binaryConverter.end()});
 	}
 
 	return jRet;

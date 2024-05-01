@@ -1,34 +1,36 @@
 #include "PluginLoader.hpp"
 
+#include <ranges>
+
 #include "imgui.h"
 
 namespace HamLab
 {
-	PluginLoader::PluginLoader(const std::string & pluginDir, DataShare & data_share_in)
-				: data_share_(data_share_in),
-				  pluginDir_(pluginDir)
+	PluginLoader::PluginLoader(const std::string & pluginDir, DataShareClass & data_share_in)
+				: dataShare(data_share_in),
+				  pluginDir(pluginDir)
 	{
-		jLocalData = data_share_.GetData("PluginLoader");
+		jLocalData = dataShare.GetData("PluginLoader");
 		LoadPlugins();
 	}
 
-	PluginLoader::PluginLoader(std::string && pluginDir, DataShare & data_share_in)
-			: data_share_(data_share_in),
-			  pluginDir_(std::move(pluginDir))
+	PluginLoader::PluginLoader(std::string && pluginDir, DataShareClass & data_share_in)
+			: dataShare(data_share_in),
+			  pluginDir(std::move(pluginDir))
 	{
-		jLocalData = data_share_.GetData("PluginLoader");
+		jLocalData = dataShare.GetData("PluginLoader");
 		LoadPlugins();
 	}
 
 	PluginLoader::~PluginLoader()
 	{
 		UnloadPlugins();
-		data_share_.SetData("PluginLoader", jLocalData);
+		dataShare.SetData("PluginLoader", jLocalData);
 	}
 
 	void PluginLoader::CallDrawSideBarFunctions()
 	{
-		for (auto &[name, plugin] : loaded_plugins_)
+		for (auto &[name, plugin] : loadedPlugins)
 		{
 			if (plugin) {
 				if (plugin->ShowSideBar()) {
@@ -45,11 +47,11 @@ namespace HamLab
 
 			jLocalData["plugins_open"] = true;
 
-			for (auto & do_plugin : all_plugins_do_load_) {
-				if (all_plugins_.contains(do_plugin.first) && ImGui::Checkbox(do_plugin.first.c_str(), &do_plugin.second)) {
-					auto & plugin = loaded_plugins_[do_plugin.first];
+			for (auto & do_plugin : allPluginsDoLoad) {
+				if (allPlugins.contains(do_plugin.first) && ImGui::Checkbox(do_plugin.first.c_str(), &do_plugin.second)) {
+					auto & plugin = loadedPlugins[do_plugin.first];
 					if (do_plugin.second) {
-						auto & lib = all_plugins_[do_plugin.first];
+						auto & lib = allPlugins[do_plugin.first];
 						if (!plugin) {
 							std::function<CreatePluginFunc> createPlugin = lib.get_alias<CreatePluginFunc>("CreatePlugin");
 
@@ -60,7 +62,7 @@ namespace HamLab
 								continue;
 							}
 
-							plugin = createPlugin(data_share_, do_plugin.first);
+							plugin = createPlugin(dataShare, do_plugin.first);
 						}
 					} else {
 						delete plugin;
@@ -77,7 +79,7 @@ namespace HamLab
 
 	void PluginLoader::CallDrawTabFunctions()
 	{
-		for (auto &[name, plugin] : loaded_plugins_)
+		for (auto &plugin : loadedPlugins | std::views::values)
 		{
 			if (plugin) {
 				if (plugin->ShowTab()) {
@@ -89,18 +91,18 @@ namespace HamLab
 
 	void PluginLoader::LoadPlugin(PluginBase * pPlugin)
 	{
-		loaded_plugins_[pPlugin->Name()] = pPlugin;
+		loadedPlugins[pPlugin->Name()] = pPlugin;
 		auto version = *HamLab::PluginBase::Version();
-		all_plugins_versions_.insert({pPlugin->Name(), version});
+		allPluginsVersions.insert({pPlugin->Name(), version});
 	}
 
 	void PluginLoader::LoadPlugins()
 	{
-		std::filesystem::path pluginPath(pluginDir_);
+		std::filesystem::path pluginPath(pluginDir);
 
 		if (!std::filesystem::exists(pluginPath) || !std::filesystem::is_directory(pluginPath))
 		{
-			std::cerr << "Invalid plugin directory: " << pluginDir_ << std::endl;
+			std::cerr << "Invalid plugin directory: " << pluginDir << std::endl;
 			return;
 		}
 
@@ -115,25 +117,25 @@ namespace HamLab
 
 	void PluginLoader::UnloadPlugins()
 	{
-		while (!loaded_plugins_.empty()) {
-			auto it = loaded_plugins_.begin();
+		while (!loadedPlugins.empty()) {
+			auto it = loadedPlugins.begin();
 
 			delete it->second;
 
-			loaded_plugins_.erase(it);
+			loadedPlugins.erase(it);
 		}
-		all_plugins_versions_.clear();
-		all_plugins_do_load_.clear();
-		all_plugins_.clear();
+		allPluginsVersions.clear();
+		allPluginsDoLoad.clear();
+		allPlugins.clear();
 	}
 
-	void PluginLoader::LoadPlugin(const std::string &path)
+	void PluginLoader::LoadPlugin(const std::string & sPath)
 	{
-		boost::dll::shared_library lib(path, boost::dll::load_mode::append_decorations);
+		boost::dll::shared_library lib(sPath, boost::dll::load_mode::append_decorations);
 
 		if (!lib.is_loaded())
 		{
-			std::cerr << "Failed to load plugin: " << path << std::endl;
+			std::cerr << "Failed to load plugin: " << sPath << std::endl;
 			return;
 		}
 
@@ -143,14 +145,14 @@ namespace HamLab
 		std::function<CreatePluginFunc> createPlugin = lib.get_alias<CreatePluginFunc>("CreatePlugin");
 
 		if (!lib.has("CreatePlugin")) {
-			std::cerr << "Failed to find CreatePlugin function in plugin: " << path << std::endl;
+			std::cerr << "Failed to find CreatePlugin function in plugin: " << sPath << std::endl;
 			return;
 		}
 
 		std::function<PluginNameFunc> pluginName = lib.get_alias<PluginNameFunc>("Name");
 		if (!pluginName)
 		{
-			std::cerr << "Failed to find Name function in plugin: " << path << std::endl;
+			std::cerr << "Failed to find Name function in plugin: " << sPath << std::endl;
 			return;
 		}
 
@@ -158,7 +160,7 @@ namespace HamLab
 
 		if (!pluginVersion)
 		{
-			std::cerr << "Failed to find Version function in plugin: " << path << std::endl;
+			std::cerr << "Failed to find Version function in plugin: " << sPath << std::endl;
 			return;
 		}
 
@@ -167,13 +169,13 @@ namespace HamLab
 
 		std::cout << "Discovered plugin: " << name << ": API Version: " << version << std::endl;
 		bool bLoad = jLocalData["loaded_plugins"][name].boolean();
-		all_plugins_[name] = lib;
-		all_plugins_versions_.insert({name, version});
-		all_plugins_do_load_[name] = bLoad;
+		allPlugins[name] = lib;
+		allPluginsVersions.insert({name, version});
+		allPluginsDoLoad[name] = bLoad;
 		if (bLoad) {
-			loaded_plugins_[name] = createPlugin(data_share_, name);
+			loadedPlugins[name] = createPlugin(dataShare, name);
 		} else {
-			loaded_plugins_[name] = nullptr;
+			loadedPlugins[name] = nullptr;
 		}
 	}
 } // HamLab
