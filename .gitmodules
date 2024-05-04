@@ -1,9 +1,3 @@
-[submodule "imgui"]
-	path = imgui
-	url = https://github.com/ocornut/imgui.git
-[submodule "json"]
-	path = json
-	url = git@github.com:VA7ODR/json_document
-[submodule "shared_recursive_mutex"]
-	path = shared_recursive_mutex
-	url = https://github.com/VA7ODR/shared_recursive_mutex.git
+[submodule "EasyAppBase"]
+	path = EasyAppBase
+	url = https://github.com/VA7ODR/EasyAppBase

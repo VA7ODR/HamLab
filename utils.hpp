@@ -87,17 +87,17 @@ inline void Asserter(bool bCondition, const std::string& sCondition, const std::
 
 std::string GetAppDataFolder();
 
-void ShowJsonWindow(const std::string & sTitle, ojson::value & jData, bool & bShow);
+void ShowJsonWindow(const std::string & sTitle, json::value & jData, bool & bShow);
 
-ojson::value ImVec4ToJSONArray(const ImVec4 & in);
-ImVec4 JSONArrayToImVec4(ojson::value & jData);
+json::value ImVec4ToJSONArray(const ImVec4 & in);
+ImVec4 JSONArrayToImVec4(json::value & jData);
 
 template <typename T>
 class jsonTypedRef
 {
 	public:
 		// Constructor for bool
-		jsonTypedRef(ojson::value & jValIn)
+		jsonTypedRef(json::value & jValIn)
 			requires std::is_same_v<T, bool>
 			: jVal(jValIn)
 		{
@@ -105,7 +105,7 @@ class jsonTypedRef
 		}
 
 		// Constructor for floating-point types
-		jsonTypedRef(ojson::value & jValIn)
+		jsonTypedRef(json::value & jValIn)
 			requires std::is_floating_point_v<T>
 			: jVal(jValIn)
 		{
@@ -114,7 +114,7 @@ class jsonTypedRef
 
 		// Constructor for integral types (excluding bool)
 		// Constructor for signed integral types
-		jsonTypedRef(ojson::value & jValIn)
+		jsonTypedRef(json::value & jValIn)
 			requires std::is_integral_v<T> && std::is_signed_v<T> && (!std::is_same_v<T, bool>)
 			: jVal(jValIn)
 		{
@@ -122,7 +122,7 @@ class jsonTypedRef
 		}
 
 		// Constructor for unsigned integral types
-		jsonTypedRef(ojson::value & jValIn)
+		jsonTypedRef(json::value & jValIn)
 			requires std::is_integral_v<T> && std::is_unsigned_v<T> && (!std::is_same_v<T, bool>)
 			: jVal(jValIn)
 		{
@@ -130,7 +130,7 @@ class jsonTypedRef
 		}
 
 		// Constructor for char*/std::string
-		jsonTypedRef(ojson::value & jValIn)
+		jsonTypedRef(json::value & jValIn)
 			requires std::is_same_v<T, char *> || std::is_same_v<T, std::string> || std::is_same_v<T, sdstring>
 			: jVal(jValIn)
 		{
@@ -165,7 +165,7 @@ class jsonTypedRef
 
 	private:
 		T m_val;
-		ojson::value & jVal;
+		json::value & jVal;
 };
 
 template <typename T>
@@ -247,7 +247,7 @@ public:
 	}
 
 	template <typename OT>
-	void Bin2Num(ojson::value & val)
+	void Bin2Num(json::value & val)
 	{
 		static_assert(std::is_arithmetic_v<OT>, "Only integral and floating-point types are supported.");
 		HandleCurrentTag handler(sCurrentTag, val.key());
@@ -266,7 +266,7 @@ public:
 		return ret;
 	}
 
-	void Bin2Str(ojson::value & val)
+	void Bin2Str(json::value & val)
 	{
 		HandleCurrentTag handler(sCurrentTag, val.key());
 		val = Bin2Str();

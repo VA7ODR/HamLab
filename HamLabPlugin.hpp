@@ -1,99 +1,81 @@
 #pragma once
 
-#include "imgui.h"
 #include "json.hpp"
 #include "shared_recursive_mutex.hpp"
+#include "easyappbase.hpp"
 
 #include <string>
 
+class HamLabException : public std::exception
+{
+	private:
+	std::string errorMessage;
+
+	public:
+	HamLabException(const std::string & sFile, int iLine, const std::string& message) : errorMessage("HamLab Exception: (" + sFile.substr(sFile.find_last_of('/') + 1) + ":" + std::to_string(iLine) + "): " +message) {}
+
+	const char* what() const noexcept override {
+		return errorMessage.c_str();
+	}
+};
+
+#define THROW_HAMLAB_EXCPETION(X) throw HamLabException(__FILE__, __LINE__, X)
+
+#define HAMLIB_ASSERT(X, Y) if (!(X)) { THROW_HAMLAB_EXCPETION(std::string("Assertion Failed: (") + #X + "): " + Y); }
+
 namespace HamLab
 {
-
 	struct APIVersion {
-		constexpr APIVersion(int major, int minor, int patch) : major(major), minor(minor), patch(patch) {}
+		constexpr APIVersion(int majorIn, int minorIn, int patchIn) : major(majorIn), minor(minorIn), patch(patchIn) {}
 
 		int major;
 		int minor;
 		int patch;
 
-		const char* toString() const {
-			const static std::string sVersion{std::to_string(major) + "." + std::to_string(minor) + "." + std::to_string(patch)};
-			return sVersion.c_str();
-		}
+		[[nodiscard]] const char* toString() const;
 	};
 
 	constexpr APIVersion CURRENT_API_VERSION{0, 0, 1};
 
-	inline std::ostream & operator<<(std::ostream & os, const APIVersion & version)
+	std::ostream & operator<<(std::ostream & os, const APIVersion & version);
+
+	class DataShareClass
 	{
-		os << version.toString();
-		return os;
-	}
+		public:
+			explicit DataShareClass(const std::string & sFileNameIn);
+			explicit DataShareClass(std::string && sFileNameIn);
+			~DataShareClass();
 
+			json::value GetData(const std::string & sKey, const json::value & jDefault);
+			json::value GetData(const std::string & sKey);
+			void SetData(const std::string & sKey, const json::value & jValue);
 
-class DataShare
-{
-	public:
-		DataShare(const std::string & sFileNameIn) : sFileName(sFileNameIn)
-		{
-			RecursiveExclusiveLock lock(mtx);
-			jData.parseFile(sFileName);
-		}
+		private:
+			SharedRecursiveMutex mtx;
+			std::string sFileName;
+			json::document jData;
+	};
 
-		~DataShare()
-		{
-			jData.writeFile(sFileName, true);
-		}
+	class PluginBase
+	{
+		public:
+			PluginBase(DataShareClass & dataShareIn, const std::string & sNameIn);
+			PluginBase(DataShareClass & dataShareIn, std::string && sNameIn);
+			virtual ~PluginBase();
 
-		ojson::value GetData(const std::string & sKey, ojson::value jDefault = ojson::value())
-		{
-			RecursiveExclusiveLock lock(mtx);
-			auto & jRet = jData[sKey];
-			if (jRet.IsVoid()) {
-				jRet = jDefault;
-			}
-			return jRet;
-		}
+			constexpr const std::string & Name() { return sName; }
 
-		void SetData(const std::string & sKey, ojson::value & jValue)
-		{
-			RecursiveExclusiveLock lock(mtx);
-			jData[sKey] = jValue;
-		}
+			static const APIVersion * Version() { return &CURRENT_API_VERSION; }
 
-	private:
-		SharedRecursiveMutex mtx;
-		std::string sFileName;
-		ojson::document jData;
-};
+			virtual void DrawTab() = 0;
+			virtual bool DrawSideBar(bool) = 0;
 
-class PluginBase
-{
-	public:
-		PluginBase(DataShare & data_share_in, const std::string & name_in) : data_share_(data_share_in), name(name_in)
-		{
-			jLocalData = data_share_.GetData(Name());
-		}
+			virtual bool ShowTab() { return true; }
+			virtual bool ShowSideBar() { return true; }
 
-		virtual ~PluginBase()
-		{
-			data_share_.SetData(Name(), jLocalData);
-		}
-
-		constexpr const std::string & Name() { return name; }
-
-		const APIVersion * Version() { return &CURRENT_API_VERSION; }
-
-		virtual void DrawTab() = 0;
-		virtual bool DrawSideBar(bool) = 0;
-
-		virtual bool ShowTab() { return true; }
-		virtual bool ShowSideBar() { return true; }
-
-	protected:
-		DataShare & data_share_;
-		std::string name;
-		ojson::document jLocalData;
-};
-
+		protected:
+			DataShareClass & dataShare;
+			std::string sName;
+			json::document jLocalData;
+	};
 } //HamLab

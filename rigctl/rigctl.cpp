@@ -7,8 +7,8 @@
 #include "utils.hpp"
 
 #include <boost/dll/alias.hpp>
-ojson::document jRigs;
-ojson::document jLog;
+json::document jRigs;
+json::document jLog;
 
 std::string PrettyFreq(freq_t freq)
 {
@@ -247,7 +247,7 @@ int rig_logger(enum rig_debug_level_e level, rig_ptr_t, const char * fmt, va_lis
 	return 1;
 }
 
-ojson::document createRigComboBoxMap()
+json::document createRigComboBoxMap()
 {
 	// Initialize Hamlib
 	rig_set_debug(RIG_DEBUG_NONE); // Set debug level if needed
@@ -322,7 +322,7 @@ ojson::document createRigComboBoxMap()
 	return jRigs;
 }
 
-RigControl::RigControl(HamLab::DataShare & pDataShareIn, const std::string & name_in) : HamLab::PluginBase(pDataShareIn, name_in)
+RigControl::RigControl(HamLab::DataShareClass & pDataShareIn, const std::string & name_in) : HamLab::PluginBase(pDataShareIn, name_in)
 {
 	jMyRigs = createRigComboBoxMap();
 	jLocalData["current_rig"]["available_settings"].clear();
@@ -591,14 +591,14 @@ bool RigControl::DrawSideBar(bool bOpen)
 		if (jLocalData["current_rig"]["rig_model"]._uint()) {
 			struct RigConfData
 			{
-					ojson::value & jData;
+					json::value & jData;
 					RIG * rig;
 			};
 
 			auto ext_func_callback = [](RIG * rig, const struct confparams * conf, rig_ptr_t pData)
 			{
 				RigConfData & data = *(RigConfData *)pData;
-				ojson::value & jData = data.jData;
+				json::value & jData = data.jData;
 				jData[conf->name]["label"] = conf->label;
 				jData[conf->name]["dflt"] = conf->dflt;
 				jData[conf->name]["tooltip"] = conf->dflt;
@@ -610,7 +610,7 @@ bool RigControl::DrawSideBar(bool bOpen)
 			auto ext_func_callback2 = [](/*RIG * rig, */ const struct confparams * conf, rig_ptr_t pData)
 			{
 				RigConfData & data = *(RigConfData *)pData;
-				ojson::value & jData = data.jData;
+				json::value & jData = data.jData;
 				char buf[128] = "";
 				rig_get_conf(data.rig, conf->token, buf);
 				jData[conf->name]["label"] = conf->label;
@@ -777,10 +777,10 @@ void RigControl::DrawTab()
 {
 	std::lock_guard lk(mutexData.mtx);
 	ImGuiIO & io = ImGui::GetIO();
-	if (ImGui::BeginTabItem(name.c_str())) {
+	if (ImGui::BeginTabItem(sName.c_str())) {
 		ImGui::BeginChild("RigTab_child");
 		{
-			auto showVFO = [](ImGuiIO & io, ojson::value & vfo, int iFontIndex)
+			auto showVFO = [](ImGuiIO & io, json::value & vfo, int iFontIndex)
 			{
 				ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
 				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
@@ -983,7 +983,7 @@ void RigControl::DrawTab()
 	}
 }
 
-HamLab::PluginBase * RigControl::create(HamLab::DataShare & data_share_, const std::string & name) { return new RigControl(data_share_, name); }
+HamLab::PluginBase * RigControl::create(HamLab::DataShareClass & data_share_, const std::string & name) { return new RigControl(data_share_, name); }
 
 BOOST_DLL_ALIAS(RigControl::create, // <-- this function is exported with...
 				CreatePlugin		// <-- ...this alias name
